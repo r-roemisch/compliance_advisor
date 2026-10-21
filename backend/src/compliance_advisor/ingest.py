@@ -8,6 +8,8 @@ neither OpenRouter nor the database.
 import argparse
 import time
 
+import openai
+
 from .chunker import chunk
 from .loaders import load
 from .registry import load_sources, select
@@ -59,8 +61,19 @@ def main() -> None:
         from .store import add_passages, delete_source
 
         started = time.monotonic()
+        try:
+            # Embed first, so a failing API call leaves the Source's old Passages in place.
+            vectors = store.embeddings.embed_documents([p.page_content for p in passages])
+        except openai.AuthenticationError as e:
+            raise SystemExit(
+                f"OpenRouter rejected the API key: {e.body}. Check OPENROUTER_API_KEY."
+            )
+        except openai.APIError as e:
+            failures += 1
+            print(f"{source.id}: embedding failed, old Passages kept: {e}")
+            continue
         removed = delete_source(store, source.id)
-        add_passages(store, passages)
+        add_passages(store, passages, vectors)
         print(
             f"{source.id}: {summary}; removed {removed} old, stored {len(passages)} "
             f"in {time.monotonic() - started:.1f}s"

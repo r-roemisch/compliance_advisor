@@ -41,6 +41,11 @@ def delete_source(store: PGVector, source_id: str) -> int:
         return result.rowcount or 0
 
 
-def add_passages(store: PGVector, passages: list[Document]) -> None:
-    ids = [row_id(store.collection_name, p.metadata["passage_id"]) for p in passages]
-    store.add_documents(passages, ids=ids)
+def add_passages(store: PGVector, passages: list[Document], vectors: list[list[float]]) -> None:
+    """Stores Passages with embeddings computed beforehand."""
+    store.add_embeddings(
+        texts=[p.page_content for p in passages],
+        embeddings=vectors,
+        metadatas=[p.metadata for p in passages],
+        ids=[row_id(store.collection_name, p.metadata["passage_id"]) for p in passages],
+    )

@@ -1,6 +1,10 @@
 # Compliance Advisor for Financial Services: the target picture
 
 > **Not legal advice.** This project gives general regulatory information only. It does not replace consultation with a qualified lawyer or the firm's own compliance function.
+'''
+my own notes:
+Advisor-facing tool for client suitability and trade pre-clearance
+'''
 
 Snapshot of the first planning summary, written 2026-10-20 before the grilling session and kept for re-reading. It is not a spec: the grilling decided otherwise in places, for example no code is reused from other projects, Firms are always supervised in Germany, and the default model is cheaper. Current decisions live in `CONTEXT.md`, `docs/ROADMAP.md` and `docs/adr/`.
 
