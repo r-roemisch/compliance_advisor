@@ -10,11 +10,11 @@ Session dates: 2026-10-20 and 2026-10-21. A planning (grilling) session of 43 qu
 - All six Sources are downloaded into `data/raw/` (confirmed by you on 2026-10-21). The loaders were fixed against the real files: EU footnote markers and list markers stay in their sentence, German nested lists keep their paragraph text, BaFin's running page headers are dropped. Dry run: about 2,000 Passages in total.
 - Known naive-RAG weakness, left for steps 3 and 4: the BaFin PDF's table of contents becomes a few Passages full of headings and page numbers.
 - Not done yet: nothing embedded.
-- `.env.example` exists at the project root. `.env` does not.
+- `.env` exists, but its key has expired. Nothing is embedded yet; the first ingest attempt stopped before storing anything.
 
 ## Waiting on you
 
-- `.env` with your OpenRouter key: `cp .env.example .env`, then add the key.
+- A new OpenRouter key in `.env`. The key put in on 2026-10-21 is rejected by OpenRouter as "API key expired"; create a new one at openrouter.ai/settings/keys.
 
 ## Next session
 
