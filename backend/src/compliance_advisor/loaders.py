@@ -30,30 +30,65 @@ def _tidy(text: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
+_BLOCKS = ["p", "div", "tr", "li", "h1", "h2", "h3", "h4", "h5", "h6", "br", "table"]
+
+
 def load_html(path: Path) -> str:
-    """EU acts as XHTML from the EU Publications Office: every block element becomes a line."""
-    soup = BeautifulSoup(path.read_bytes(), "lxml")
+    """EU acts as XHTML from the EU Publications Office.
+
+    Block elements (paragraphs, table rows) become lines; inline elements such as footnote
+    markers stay inside their sentence; table cells in a row are joined with a space, so a
+    recital number stays next to its text.
+    """
+    soup = BeautifulSoup(path.read_bytes(), "xml")
     for tag in soup(["script", "style", "head", "nav"]):
         tag.decompose()
-    return _tidy(soup.get_text("\n"))
-
-
-def _words(element) -> str:
-    return " ".join(" ".join(element.itertext()).split())
+    # The file's own indentation and line breaks between tags are not part of the text.
+    for string in soup.find_all(string=True):
+        string.replace_with(re.sub(r"\s+", " ", string))
+    for cell in soup.find_all(["td", "th"]):
+        cell.append(" ")
+    for block in soup.find_all(_BLOCKS):
+        inside_cell = block.name != "tr" and block.find_parent(["td", "th"]) is not None
+        block.append(" " if inside_cell else "\n")
+    return _tidy(soup.get_text())
 
 
 def _lines(content) -> list[str]:
-    """Paragraphs stay paragraphs; in numbered lists each item gets its own line ("1. text")."""
-    lines = []
-    for child in content:
-        if child.tag == "DL":
-            for dt in child.iterfind("DT"):
-                dd = dt.getnext()
-                item = _words(dd) if dd is not None and dd.tag == "DD" else ""
-                lines.append(f"{_words(dt)} {item}".strip())
+    """Paragraphs become lines. Numbered lists, also when nested inside a paragraph or inside
+    another list item, put each item on its own line ("1. text", "a) text")."""
+    lines: list[str] = []
+    buffer: list[str] = []
+
+    def flush() -> None:
+        text = " ".join(" ".join(buffer).split())
+        if text:
+            lines.append(text)
+        buffer.clear()
+
+    def walk(element) -> None:
+        if element.tag == "DL":
+            flush()
+            for item in element:
+                if item.tag == "DT":
+                    flush()
+                walk_inner(item)
+            flush()
         else:
-            lines.append(_words(child))
-    return [line for line in lines if line]
+            walk_inner(element)
+        if element.tail:
+            buffer.append(element.tail)
+
+    def walk_inner(element) -> None:
+        if element.text:
+            buffer.append(element.text)
+        for child in element:
+            walk(child)
+
+    for child in content:
+        walk(child)
+        flush()
+    return lines
 
 
 def load_gii_xml(path: Path) -> str:
@@ -75,10 +110,26 @@ def load_gii_xml(path: Path) -> str:
     return _tidy("\n\n".join(blocks))
 
 
+def _shape(line: str) -> str:
+    return re.sub(r"\d+", "#", line.strip())
+
+
 def load_pdf(path: Path) -> str:
-    """PDF documents, for example BaFin guidance, read page by page."""
-    reader = PdfReader(path)
-    return _tidy("\n\n".join(page.extract_text() or "" for page in reader.pages))
+    """PDF documents, for example BaFin guidance, read page by page.
+
+    Lines that repeat on at least half of the pages, ignoring numbers, are running headers or
+    footers ("... Seite 3 von 105") and are dropped.
+    """
+    pages = [(page.extract_text() or "").splitlines() for page in PdfReader(path).pages]
+    repeated: set[str] = set()
+    if len(pages) >= 4:
+        counts: dict[str, int] = {}
+        for lines in pages:
+            for shape in {_shape(line) for line in lines if line.strip()}:
+                counts[shape] = counts.get(shape, 0) + 1
+        repeated = {shape for shape, n in counts.items() if n >= len(pages) / 2}
+    kept = ["\n".join(line for line in lines if _shape(line) not in repeated) for lines in pages]
+    return _tidy("\n\n".join(kept))
 
 
 LOADERS = {"html": load_html, "gii_xml": load_gii_xml, "pdf": load_pdf}

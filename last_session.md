@@ -7,19 +7,19 @@ Session dates: 2026-10-20 and 2026-10-21. A planning (grilling) session of 43 qu
 - Planning is done and written down: `CONTEXT.md`, `docs/ROADMAP.md` (step 1 in detail with its acceptance list), `docs/adr/0001` to `0003`, `README.md`, `docs/VISION.md` as a snapshot for re-reading only.
 - Sub-step 1a code is in place under `backend/src/compliance_advisor/`: settings, registry, fetch, loaders, chunker, embeddings, store, ingest. Postgres runs via `docker compose up -d postgres` on port 5433.
 - Checked without downloads: the registry validates; the three loaders work on small synthetic files; the store stores, deletes and re-stores without duplicates (second run: removed 6, stored 6, found 6).
-- Not done yet: no Source downloaded, nothing embedded. The loaders have not seen the real files.
+- All six Sources are downloaded into `data/raw/` (confirmed by you on 2026-10-21). The loaders were fixed against the real files: EU footnote markers and list markers stay in their sentence, German nested lists keep their paragraph text, BaFin's running page headers are dropped. Dry run: about 2,000 Passages in total.
+- Known naive-RAG weakness, left for steps 3 and 4: the BaFin PDF's table of contents becomes a few Passages full of headings and page numbers.
+- Not done yet: nothing embedded.
 - `.env.example` exists at the project root. `.env` does not.
 
 ## Waiting on you
 
 - `.env` with your OpenRouter key: `cp .env.example .env`, then add the key.
-- A yes for each of the six downloads (addresses in `config/sources.yaml`).
 
 ## Next session
 
-1. Download the six Sources one by one after your yes; look at size and a text sample of each.
-2. `compliance-advisor-ingest --dry-run`, fix the loaders if the real files show problems, then ingest for real. Sub-step 1a is done when all six are stored.
-3. Check-in, then 1b: API, prompt, tests. Then 1c: page, Dockerfiles, compose with three containers; run the "done when" list in the roadmap.
+1. Once `.env` holds the key: `uv run compliance-advisor-ingest` and check that about 2,000 Passages are stored. Sub-step 1a is then done.
+2. Check-in, then 1b: API, prompt, tests. Then 1c: page, Dockerfiles, compose with three containers; run the "done when" list in the roadmap.
 
 admap.
 
