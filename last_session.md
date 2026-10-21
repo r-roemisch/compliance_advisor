@@ -5,23 +5,25 @@
 Session dates: 2026-10-20 and 2026-10-21. A planning (grilling) session of 43 questions, then the code of sub-st## Where things stand
 
 - Planning is done and written down: `CONTEXT.md`, `docs/ROADMAP.md` (step 1 in detail with its acceptance list), `docs/adr/0001` to `0003`, `README.md`, `docs/VISION.md` as a snapshot for re-reading only.
-- Sub-step 1a code is in place under `backend/src/compliance_advisor/`: settings, registry, fetch, loaders, chunker, embeddings, store, ingest. Postgres runs via `docker compose up -d postgres` on port 5433.
-- Checked without downloads: the registry validates; the three loaders work on small synthetic files; the store stores, deletes and re-stores without duplicates (second run: removed 6, stored 6, found 6).
-- All six Sources are downloaded into `data/raw/` (confirmed by you on 2026-10-21). The loaders were fixed against the real files: EU footnote markers and list markers stay in their sentence, German nested lists keep their paragraph text, BaFin's running page headers are dropped. Dry run: about 2,000 Passages in total.
-- Known naive-RAG weakness, left for steps 3 and 4: the BaFin PDF's table of contents becomes a few Passages full of headings and page numbers.
-- Not done yet: nothing embedded.
-- `.env` exists, but its key has expired. Nothing is embedded yet; the first ingest attempt stopped before storing anything.
+- **Sub-step 1a is done.** Code under `backend/src/compliance_advisor/`: settings, registry, fetch, loaders, chunker, embeddings, store, ingest. Postgres runs via `docker compose up -d postgres` on port 5433.
+- All six Sources are downloaded into `data/raw/` and stored: 2,175 Passages, 1,536 dimensions, collection `openai/text-embedding-3-small`. The ingest took about 33 seconds and cost under one cent.
+- Two test searches worked: an English DORA question found DORA Articles 17 and 19 and recitals of the incident classification standard; a German question found § 10 GwG first, then the matching BaFin guidance.
+- The ingest embeds before deleting, so a failed API call keeps a Source's old Passages; a rejected key stops with one readable line.
+
+## Known weaknesses, left for steps 3 and 4
+
+- The DORA "major incident" search found the standard's recitals, not its Article 8 with the actual criteria. Naive retrieval does not pull the Level 2 article next to the Level 1 article.
+- The BaFin PDF's table of contents becomes a few Passages of headings and page numbers.
+- PDF extraction sometimes splits a word with a space ("Sor gfaltspflichten").
 
 ## Waiting on you
 
-- A new OpenRouter key in `.env`. The key put in on 2026-10-21 is rejected by OpenRouter as "API key expired"; create a new one at openrouter.ai/settings/keys.
+- "Go" for sub-step 1b.
 
 ## Next session
 
-1. Once `.env` holds the key: `uv run compliance-advisor-ingest` and check that about 2,000 Passages are stored. Sub-step 1a is then done.
-2. Check-in, then 1b: API, prompt, tests. Then 1c: page, Dockerfiles, compose with three containers; run the "done when" list in the roadmap.
-
-admap.
+1. Sub-step 1b: FastAPI with `POST /api/ask`, `GET /api/health`, `GET /api/sources`; retriever, prompt, GPT-6 Luna; the agreed response shape; about ten unit tests.
+2. Check-in, then 1c: page, Dockerfiles, compose with three containers; run the "done when" list in the roadmap.
 
 ## Agreed prompt (goes into `backend/.../prompt.py` in 1b)
 

@@ -16,7 +16,7 @@ The Compliance Advisor is built step by step, one or more sessions per step, and
 
 Built in three sub-steps with a check-in after each.
 
-### 1a. Sources in
+### 1a. Sources in (done 2026-10-21: 2,175 Passages from six Sources)
 
 - Backend scaffold: uv project, Python 3.12, package `compliance_advisor` under `backend/src/`, FastAPI, LangChain.
 - `config/sources.yaml` with the six seed Sources listed in the README. Fields: `id`, `title`, `short_title`, `regime` (dora, aml, payments), `layer` (eu_level_1, eu_level_2, eu_level_3, national_law, supervisory_practice), `issuer`, `language` (en, de), `format` (html, gii_xml, pdf), `url`, `display_url`, `notes`. Unknown values stop the command with a clear message.
