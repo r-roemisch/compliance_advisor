@@ -62,6 +62,11 @@ def test_cited_numbers_ignore_numbers_that_were_not_given():
     assert cited_numbers("See [2] and [1, 2]; also [7].", available=2) == [2, 1]
 
 
+def test_cited_numbers_accept_provisions_inside_the_bracket():
+    text = "Guidelines [1, Art. 32 Abs. 1-2]; reporting [DORA Art. 19(1) [3]]; [4; 2]."
+    assert cited_numbers(text, available=6) == [1, 3, 4, 2]
+
+
 def test_ask_returns_the_agreed_shape():
     reply = AIMessage(
         content="Major incidents are reported [1].",

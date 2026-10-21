@@ -16,7 +16,7 @@ from .settings import OPENROUTER_BASE_URL, Settings
 
 log = logging.getLogger("compliance_advisor.ask")
 
-_CITATION = re.compile(r"\[(\d+(?:\s*,\s*\d+)*)\]")
+_BRACKETS = re.compile(r"\[([^\[\]]*)\]")  # innermost [...] groups
 
 
 class UpstreamError(RuntimeError):
@@ -39,12 +39,17 @@ def get_answer_model(settings: Settings) -> ChatOpenAI:
 
 
 def cited_numbers(answer: str, available: int) -> list[int]:
-    """The passage numbers the answer cites, in order, ignoring numbers it was not given."""
+    """The passage numbers the answer cites, in order, ignoring numbers it was not given.
+
+    Handles "[1]", "[1, 2]", "[1; 3]" and "[1, Art. 32 Abs. 1]": inside a bracket, every part
+    between commas or semicolons that is a bare number counts.
+    """
     found: list[int] = []
-    for group in _CITATION.findall(answer):
-        for number in (int(x) for x in group.split(",")):
-            if 1 <= number <= available and number not in found:
-                found.append(number)
+    for group in _BRACKETS.findall(answer):
+        for part in re.split(r"[,;]", group):
+            part = part.strip()
+            if part.isdigit() and 1 <= int(part) <= available and int(part) not in found:
+                found.append(int(part))
     return found
 
 

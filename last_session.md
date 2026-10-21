@@ -4,11 +4,12 @@
 
 Session dates: 2026-10-20 and 2026-10-21. A planning (grilling) session of 43 questions, then the code of sub-st## Where things stand
 
-- Planning is done and written down: `CONTEXT.md`, `docs/ROADMAP.md` (step 1 in detail with its acceptance list), `docs/adr/0001` to `0003`, `README.md`, `docs/VISION.md` as a snapshot for re-reading only.
-- **Sub-step 1a is done.** Six Sources downloaded and stored: 2,155 Passages in the collection `openai/text-embedding-3-small`. Postgres runs via `docker compose up -d postgres` on port 5433.
-- **Sub-step 1b is done.** `uv run compliance-advisor-api` serves `POST /api/ask`, `GET /api/health` and `GET /api/sources` on port 8010. Modules: `retriever.py`, `prompt.py`, `answer.py`, `api.py`, `schemas.py`. 12 unit tests pass without network or database.
-- The response carries the agreed fields; each Passage also has `passage_id` and `issuer`.
-- The PDF loader now removes running headers only at the top and bottom of a page; a test showed the earlier version could drop real content lines. The BaFin PDF was re-indexed (377 Passages).
+- **Step 1 is done.** All four "done when" checks in `docs/ROADMAP.md` are met.
+- `docker compose up --build` starts exactly three containers: postgres (5433), backend (8010), frontend (3010). The page at http://localhost:3010 asks, shows a waiting message, renders the answer, lists the six Passages with cited ones marked, lists the Sources, and shows the notice permanently at the bottom.
+- The Corpus: six Sources, 2,155 Passages in the Docker volume `compliance_advisor_postgres-data`.
+- 13 unit tests pass without network or database.
+- Fixed in 1c after looking at the page: citations like "[1, Art. 32 Abs. 1]" were not counted; an English question naming the GwG got a German answer. Both fixed and re-checked.
+- Planning documents: `CONTEXT.md`, `docs/ROADMAP.md`, `docs/adr/0001` to `0003`, `README.md`, `docs/VISION.md` (snapshot for re-reading only).
 
 ## Acceptance questions, run 2026-10-21 with GPT-6 Luna
 
@@ -26,16 +27,17 @@ Each answer costs about 0.1 cent.
 - One Source can fill all six slots.
 - The BaFin PDF's table of contents becomes a few Passages of headings and page numbers. PDF extraction sometimes splits a word ("Sor gfaltspflichten").
 - Answers take 10 to 30 seconds and are long; streaming (step 2) will make the wait visible.
-- The model sometimes nests citations, as in "[DORA Art. 18(1) [1]]". The `cited` list is still correct.
+- The model sometimes nests citations, as in "[DORA Art. 18(1) [1]]" or "[1, Art. 32 Abs. 1]". The `cited` list handles both.
+- The AMLR question "when does it apply" did not retrieve Article 90 with the application date; the answer says the date is not in the passages.
 
 ## Waiting on you
 
-- "Go" for sub-step 1c.
+- The design session (step 2): layout, chat flow, how Passages and Citations are shown, streaming.
 
 ## Next session
 
-1. Sub-step 1c: Next.js page, backend and frontend Dockerfiles, compose with three containers; run the "done when" list in the roadmap.
-2. Then step 2, the design session.
+1. Step 2, the design session. The current page is deliberately bare and only proves the pipeline.
+2. Then step 3, the evaluation harness, so the weaknesses above can be measured before step 4 fixes them.
 
 ## Agreed prompt (goes into `backend/.../prompt.py` in 1b)
 

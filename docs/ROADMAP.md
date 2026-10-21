@@ -12,7 +12,7 @@ The Compliance Advisor is built step by step, one or more sessions per step, and
 - No code, docs or wording are reused from other projects. This project stands on its own.
 - Terms live in `CONTEXT.md`; hard-to-reverse decisions in `docs/adr/`; the handoff note for the next session in `last_session.md`.
 
-## Step 1: Naive RAG (in progress, designed 2026-10-20/21)
+## Step 1: Naive RAG (done 2026-10-21)
 
 Built in three sub-steps with a check-in after each.
 
@@ -40,18 +40,19 @@ Built in three sub-steps with a check-in after each.
 - About ten unit tests without network or database: loaders on fixtures, Passage id determinism, prompt formatting, API validation with model and embeddings mocked.
 - Added during the build: each Passage in the response also carries `passage_id` and `issuer`.
 
-### 1c. Page and containers
+### 1c. Page and containers (done 2026-10-21)
 
 - Next.js 16 with TypeScript, App Router, Tailwind and ESLint; `/api/*` forwarded to the backend by a rewrite rule; react-markdown for the answer.
 - One page: question box, Ask button, spinner, the answer, the six Passages with the cited ones marked, an error line, the permanent notice below the chat, the list of Sources in the Corpus.
 - Backend and frontend Dockerfiles; compose with exactly three containers; host ports 5433 (Postgres), 8010 (backend), 3010 (frontend).
 - Development loop: backend and frontend run locally against the Postgres container; `docker compose up --build` for full runs.
+- Added during the build: the Next.js proxy timeout is raised to 120 seconds, because answers take up to 30 seconds and the default limit is 30; citations such as "[1, Art. 32 Abs. 1]" are counted as citing Passage 1; the language rule in the prompt names German acts explicitly, because an English question mentioning the GwG got a German answer.
 
 ### Settings
 
 `.env`: `OPENROUTER_API_KEY`, `DATABASE_URL`, `EMBEDDING_MODEL`, `ANSWER_MODEL`, `TOP_K`, `CHUNK_SIZE`, `CHUNK_OVERLAP`.
 
-### Done when
+### Done when (all four met on 2026-10-21)
 
 1. Fetch and ingest run on all six Sources without errors, and `--dry-run` shows sensible Passage counts.
 2. Three questions get sensible cited answers: English on DORA incident reporting, German on GwG due diligence, and one outside the Corpus that shows the "not covered" behaviour.
@@ -60,7 +61,7 @@ Built in three sub-steps with a check-in after each.
 
 Delivers: H1 in full (knowledge base, embeddings, chunking, similarity search); H3 partly (domain, focused knowledge base, domain prompt); H4 (LangChain with OpenRouter, error handling, input validation); H5 partly (Next.js, sources shown, progress indicator); A source citations; C multi-language partly (German and English Sources, answer in the question's language).
 
-## Step 2: Design session, UI layout (todo)
+## Step 2: Design session, UI layout (next)
 
 - Decide the layout, the chat flow, how Passages, Citations and later tool results are shown; streaming answers; conversation history
 - Delivers: H5 in full; A conversation history and export; A help feature or guide

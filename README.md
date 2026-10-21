@@ -8,11 +8,22 @@ Built step by step as a Turing College bootcamp project. The plan and the curren
 
 ## Status
 
-Step 1, a naive RAG, is being built in three sub-steps. Sub-step 1a (Sources in) and 1b (question-and-answer API) are done. The page and the containers follow in 1c.
+Step 1, a naive RAG, is done: six Sources, an index pipeline, a question-and-answer API and a bare page, running as three containers. Step 2 decides the layout and design.
+
+## Quick start
+
+Needs Docker and an [OpenRouter](https://openrouter.ai) API key.
+
+```bash
+cp .env.example .env               # add your OPENROUTER_API_KEY
+docker compose up --build          # postgres, backend, frontend
+```
+
+Then open **http://localhost:3010**. The backend API runs on port 8010 and Postgres on port 5433. The Corpus must be filled once, as described in the next section; it is kept in a Docker volume.
 
 ## Getting the Sources in
 
-Needs Docker, [uv](https://docs.astral.sh/uv/) and an [OpenRouter](https://openrouter.ai) API key.
+For local development, run the database in Docker and the commands with [uv](https://docs.astral.sh/uv/). Inside Docker the same commands work as `docker compose run --rm backend compliance-advisor-ingest`.
 
 ```bash
 cp .env.example .env                                   # add your OPENROUTER_API_KEY
@@ -25,7 +36,7 @@ uv run compliance-advisor-ingest                       # embed and store every d
 
 `compliance-advisor-fetch --all` downloads every Source. `compliance-advisor-ingest --source <id>` re-indexes one Source: its old Passages are deleted first, so running it again never creates duplicates.
 
-## Asking questions
+## Asking questions without the page
 
 ```bash
 cd backend
@@ -34,6 +45,8 @@ curl -s -X POST localhost:8010/api/ask -H 'content-type: application/json' \
      -d '{"question": "When is an ICT-related incident major under DORA?"}'
 uv run pytest                                          # unit tests, no network, no database
 ```
+
+The page in development: `cd frontend && npm install && npm run dev`, then http://localhost:3010. It forwards `/api/*` to the backend on port 8010.
 
 | Endpoint | Does |
 |---|---|
