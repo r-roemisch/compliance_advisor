@@ -65,8 +65,9 @@ def main() -> None:
             # Embed first, so a failing API call leaves the Source's old Passages in place.
             vectors = store.embeddings.embed_documents([p.page_content for p in passages])
         except openai.AuthenticationError as e:
+            reason = e.body.get("message", e.body) if isinstance(e.body, dict) else e.body
             raise SystemExit(
-                f"OpenRouter rejected the API key: {e.body}. Check OPENROUTER_API_KEY."
+                f"OpenRouter rejected the API key ({reason}). Check OPENROUTER_API_KEY."
             )
         except openai.APIError as e:
             failures += 1
