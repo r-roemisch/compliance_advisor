@@ -117,18 +117,33 @@ def _shape(line: str) -> str:
 def load_pdf(path: Path) -> str:
     """PDF documents, for example BaFin guidance, read page by page.
 
-    Lines that repeat on at least half of the pages, ignoring numbers, are running headers or
-    footers ("... Seite 3 von 105") and are dropped.
+    Running headers and footers are dropped: a line among the first or last two lines of a
+    page whose shape (ignoring numbers) recurs there on at least half of the pages, such as
+    "... Stand: Juli 2025 Seite 3 von 105". Lines in the middle of a page are always kept.
     """
-    pages = [(page.extract_text() or "").splitlines() for page in PdfReader(path).pages]
+    pages = [
+        [line for line in (page.extract_text() or "").splitlines() if line.strip()]
+        for page in PdfReader(path).pages
+    ]
+
+    def edges(lines: list[str]) -> set[int]:
+        return {i for i in (0, 1, len(lines) - 2, len(lines) - 1) if 0 <= i < len(lines)}
+
     repeated: set[str] = set()
     if len(pages) >= 4:
         counts: dict[str, int] = {}
         for lines in pages:
-            for shape in {_shape(line) for line in lines if line.strip()}:
+            for shape in {_shape(lines[i]) for i in edges(lines)}:
                 counts[shape] = counts.get(shape, 0) + 1
         repeated = {shape for shape, n in counts.items() if n >= len(pages) / 2}
-    kept = ["\n".join(line for line in lines if _shape(line) not in repeated) for lines in pages]
+    kept = [
+        "\n".join(
+            line
+            for i, line in enumerate(lines)
+            if not (i in edges(lines) and _shape(line) in repeated)
+        )
+        for lines in pages
+    ]
     return _tidy("\n\n".join(kept))
 
 

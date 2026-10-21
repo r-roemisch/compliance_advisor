@@ -30,7 +30,7 @@ Built in three sub-steps with a check-in after each.
 - Postgres container via compose: project name `compliance_advisor`, host port 5433, user, password and database `advisor`.
 - Backend modules, one per stage: `settings.py`, `registry.py`, `fetch.py`, `loaders.py`, `chunker.py`, `embeddings.py`, `store.py`, `ingest.py`, `retriever.py`, `prompt.py`, `answer.py`, `api.py`, `schemas.py`.
 
-### 1b. Questions answered
+### 1b. Questions answered (done 2026-10-21: three test questions answered, 12 tests pass)
 
 - `POST /api/ask` with `{question, top_k?}`: validate (3 to 2000 characters, otherwise 422), embed the question, top-6 cosine similarity search with scores, build the prompt, call `openai/gpt-6-luna` through `ChatOpenAI` with OpenRouter's base URL, return the agreed response shape (see `last_session.md` until it lives in `schemas.py`).
 - `GET /api/health` (alive, database reachable) and `GET /api/sources` (what the Corpus holds).
@@ -38,6 +38,7 @@ Built in three sub-steps with a check-in after each.
 - Prompt: the agreed professional prompt in `prompt.py`. No disclaimer inside the answer text; the `disclaimer` field travels with every response.
 - Errors: 502 when the Answer Model fails, 503 when the database is unreachable; the page shows the message. One log line per question with duration, Passage ids, model and token counts.
 - About ten unit tests without network or database: loaders on fixtures, Passage id determinism, prompt formatting, API validation with model and embeddings mocked.
+- Added during the build: each Passage in the response also carries `passage_id` and `issuer`.
 
 ### 1c. Page and containers
 

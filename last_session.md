@@ -5,25 +5,37 @@
 Session dates: 2026-10-20 and 2026-10-21. A planning (grilling) session of 43 questions, then the code of sub-st## Where things stand
 
 - Planning is done and written down: `CONTEXT.md`, `docs/ROADMAP.md` (step 1 in detail with its acceptance list), `docs/adr/0001` to `0003`, `README.md`, `docs/VISION.md` as a snapshot for re-reading only.
-- **Sub-step 1a is done.** Code under `backend/src/compliance_advisor/`: settings, registry, fetch, loaders, chunker, embeddings, store, ingest. Postgres runs via `docker compose up -d postgres` on port 5433.
-- All six Sources are downloaded into `data/raw/` and stored: 2,175 Passages, 1,536 dimensions, collection `openai/text-embedding-3-small`. The ingest took about 33 seconds and cost under one cent.
-- Two test searches worked: an English DORA question found DORA Articles 17 and 19 and recitals of the incident classification standard; a German question found § 10 GwG first, then the matching BaFin guidance.
-- The ingest embeds before deleting, so a failed API call keeps a Source's old Passages; a rejected key stops with one readable line.
+- **Sub-step 1a is done.** Six Sources downloaded and stored: 2,155 Passages in the collection `openai/text-embedding-3-small`. Postgres runs via `docker compose up -d postgres` on port 5433.
+- **Sub-step 1b is done.** `uv run compliance-advisor-api` serves `POST /api/ask`, `GET /api/health` and `GET /api/sources` on port 8010. Modules: `retriever.py`, `prompt.py`, `answer.py`, `api.py`, `schemas.py`. 12 unit tests pass without network or database.
+- The response carries the agreed fields; each Passage also has `passage_id` and `issuer`.
+- The PDF loader now removes running headers only at the top and bottom of a page; a test showed the earlier version could drop real content lines. The BaFin PDF was re-indexed (377 Passages).
+
+## Acceptance questions, run 2026-10-21 with GPT-6 Luna
+
+| Question | Result | Time | Tokens in / out |
+|---|---|---|---|
+| English, DORA major-incident reporting | Good: cites Art. 17, 18, 19 DORA and recital 10 of the standard; says the thresholds are not in the passages | 29 s | 1,605 / 1,825 |
+| German, GwG due diligence and BaFin expectations | Honest but weak: all six Passages came from the BaFin guidance, § 10 GwG itself was not retrieved, and the answer says so | 21 s | 2,408 / 1,412 |
+| Outside the Corpus, CRR operational-risk capital | Correct: says the passages do not cover it | 9 s | 1,587 / 446 |
+
+Each answer costs about 0.1 cent.
 
 ## Known weaknesses, left for steps 3 and 4
 
-- The DORA "major incident" search found the standard's recitals, not its Article 8 with the actual criteria. Naive retrieval does not pull the Level 2 article next to the Level 1 article.
-- The BaFin PDF's table of contents becomes a few Passages of headings and page numbers.
-- PDF extraction sometimes splits a word with a space ("Sor gfaltspflichten").
+- Retrieval does not pull the detailed article next to the general one: the DORA question got the standard's recitals, not its Article 8; the GwG question got only BaFin guidance, not § 10 GwG.
+- One Source can fill all six slots.
+- The BaFin PDF's table of contents becomes a few Passages of headings and page numbers. PDF extraction sometimes splits a word ("Sor gfaltspflichten").
+- Answers take 10 to 30 seconds and are long; streaming (step 2) will make the wait visible.
+- The model sometimes nests citations, as in "[DORA Art. 18(1) [1]]". The `cited` list is still correct.
 
 ## Waiting on you
 
-- "Go" for sub-step 1b.
+- "Go" for sub-step 1c.
 
 ## Next session
 
-1. Sub-step 1b: FastAPI with `POST /api/ask`, `GET /api/health`, `GET /api/sources`; retriever, prompt, GPT-6 Luna; the agreed response shape; about ten unit tests.
-2. Check-in, then 1c: page, Dockerfiles, compose with three containers; run the "done when" list in the roadmap.
+1. Sub-step 1c: Next.js page, backend and frontend Dockerfiles, compose with three containers; run the "done when" list in the roadmap.
+2. Then step 2, the design session.
 
 ## Agreed prompt (goes into `backend/.../prompt.py` in 1b)
 

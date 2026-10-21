@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     top_k: int = 6
     chunk_size: int = 1000
     chunk_overlap: int = 150
+    api_host: str = "127.0.0.1"
+    api_port: int = 8010
 
     config_dir: Path = PROJECT_ROOT / "config"
     data_dir: Path = PROJECT_ROOT / "data"

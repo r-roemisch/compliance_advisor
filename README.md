@@ -8,7 +8,7 @@ Built step by step as a Turing College bootcamp project. The plan and the curren
 
 ## Status
 
-Step 1, a naive RAG, is being built in three sub-steps. Sub-step 1a, getting the Sources in, has its code in place. The question-and-answer API and the page follow in 1b and 1c.
+Step 1, a naive RAG, is being built in three sub-steps. Sub-step 1a (Sources in) and 1b (question-and-answer API) are done. The page and the containers follow in 1c.
 
 ## Getting the Sources in
 
@@ -24,6 +24,24 @@ uv run compliance-advisor-ingest                       # embed and store every d
 ```
 
 `compliance-advisor-fetch --all` downloads every Source. `compliance-advisor-ingest --source <id>` re-indexes one Source: its old Passages are deleted first, so running it again never creates duplicates.
+
+## Asking questions
+
+```bash
+cd backend
+uv run compliance-advisor-api                          # API on http://localhost:8010
+curl -s -X POST localhost:8010/api/ask -H 'content-type: application/json' \
+     -d '{"question": "When is an ICT-related incident major under DORA?"}'
+uv run pytest                                          # unit tests, no network, no database
+```
+
+| Endpoint | Does |
+|---|---|
+| `POST /api/ask` | Question in (3 to 2000 characters, optional `top_k`); answer with numbered Passages, the cited numbers, model, token usage and the notice out |
+| `GET /api/health` | Says whether the backend runs and the database is reachable |
+| `GET /api/sources` | Lists the Sources and how many Passages each has in the Corpus |
+
+Errors come back as `{"detail": "..."}`: 422 for invalid input, 502 when OpenRouter does not respond, 503 when the database is not reachable. The interactive API documentation is at http://localhost:8010/docs.
 
 ## Seed Sources
 
