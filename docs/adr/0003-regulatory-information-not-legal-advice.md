@@ -1,0 +1,3 @@
+# Regulatory information, not legal advice
+
+The Compliance Advisor gives Guidance: what a provision requires, whom it applies to, what BaFin expects and what Firms typically do, stated from the Sources with Citations, and with clear directions where the Sources support them. It never judges whether a specific Firm is compliant, because that is legal advice, which in Germany only lawyers may provide as a service and which carries liability. The prompt forbids such judgements and any self-added disclaimers; every API response carries the notice in a separate field; and the UI shows it permanently below the chat rather than at the end of each answer, which was judged annoying and unnecessary for professional users. Decided in the planning session of 2026-10-20/21.

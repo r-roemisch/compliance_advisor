@@ -1,0 +1,14 @@
+# secrets
+.env
+# downloaded Sources and local data
+data/
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+# node
+node_modules/
+.next/
+*.tsbuildinfo

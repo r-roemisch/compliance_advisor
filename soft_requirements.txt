@@ -1,0 +1,26 @@
+A. Easy
+- Add conversation history and export functionality
+- Add visualisation of RAG process
+- Include source citations in responses
+- Add an interactive help feature or chatbot guide
+
+B. Medium
+- Implement multi-model support (OpenAI, Anthropic, etc.)
+- Add real-time data updates to knowledge base
+- Protect your app against prompt injection
+- Add user authentication and personalisation
+- Calculate and display token usage and costs
+- Add visualisation of tool call results
+- Implement conversation export in various formats (PDF, CSV, JSON)
+- Connect to tools from a publicly available remote MCP server
+- Implement rate limiting and API key management
+- Add logging and monitoring
+
+C. Hard
+- Employ hybrid search
+- Implement A/B testing for different RAG strategies
+- Add automated knowledge base updates
+- Add multi-language support
+- Implement advanced analytics dashboard
+- Implement your tools (functions) as MCP servers
+- Implement an evaluation of your RAG system, using RAGAs or otherwise

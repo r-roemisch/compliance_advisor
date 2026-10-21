@@ -1,0 +1,93 @@
+# Source Registry: every Source the Compliance Advisor should hold, and where it comes from.
+# Terms (Source, Regime, Regulatory Layer) are defined in CONTEXT.md.
+#
+# Not legal advice. The Compliance Advisor gives general regulatory information only.
+#
+# Fields
+#   id            kebab-case, prefixed eu- or de-
+#   title         full official title
+#   short_title   the name used in citations, e.g. DORA, GwG
+#   regime        dora | aml | payments                        (grows with the corpus)
+#   layer         eu_level_1 | eu_level_2 | eu_level_3 | national_law | supervisory_practice
+#   issuer        who issued it; shown next to a citation
+#   language      en | de                                      (official language, ADR 0002)
+#   format        html | gii_xml | pdf                         (chooses the loader)
+#   url           where compliance-advisor-fetch downloads the file
+#   display_url   the page a person opens to read the Source (optional; defaults to url)
+#   notes         anything worth knowing
+#
+# EU acts are downloaded from the EU Publications Office (publications.europa.eu), which serves
+# the same official text as EUR-Lex. EUR-Lex itself answers scripts with an empty challenge page.
+# Addresses checked 2026-10-21.
+
+sources:
+
+  - id: eu-dora
+    title: "Regulation (EU) 2022/2554 on digital operational resilience for the financial sector (DORA)"
+    short_title: DORA
+    regime: dora
+    layer: eu_level_1
+    issuer: European Parliament and Council
+    language: en
+    format: html
+    url: https://publications.europa.eu/resource/celex/32022R2554
+    display_url: https://eur-lex.europa.eu/eli/reg/2022/2554/oj/eng
+    notes: "Applies from 17 January 2025. Original text as published in the Official Journal."
+
+  - id: eu-dora-rts-incidents
+    title: "Commission Delegated Regulation (EU) 2024/1772 on the criteria for the classification of ICT-related incidents and cyber threats (RTS under DORA)"
+    short_title: "Delegated Regulation (EU) 2024/1772"
+    regime: dora
+    layer: eu_level_2
+    issuer: European Commission
+    language: en
+    format: html
+    url: https://publications.europa.eu/resource/celex/32024R1772
+    display_url: https://eur-lex.europa.eu/eli/reg_del/2024/1772/oj/eng
+    notes: "Specifies DORA Article 18: when an ICT-related incident is major."
+
+  - id: eu-amlr
+    title: "Regulation (EU) 2024/1624 on the prevention of the use of the financial system for the purposes of money laundering or terrorist financing (AMLR)"
+    short_title: AMLR
+    regime: aml
+    layer: eu_level_1
+    issuer: European Parliament and Council
+    language: en
+    format: html
+    url: https://publications.europa.eu/resource/celex/32024R1624
+    display_url: https://eur-lex.europa.eu/eli/reg/2024/1624/oj/eng
+    notes: "Applies from 10 July 2027. Not yet applicable law; until then the GwG governs."
+
+  - id: de-gwg
+    title: "Gesetz über das Aufspüren von Gewinnen aus schweren Straftaten (Geldwäschegesetz – GwG)"
+    short_title: GwG
+    regime: aml
+    layer: national_law
+    issuer: German federal legislator
+    language: de
+    format: gii_xml
+    url: https://www.gesetze-im-internet.de/gwg_2017/xml.zip
+    display_url: https://www.gesetze-im-internet.de/gwg_2017/
+
+  - id: de-bafin-aua-gwg
+    title: "BaFin – Auslegungs- und Anwendungshinweise zum Geldwäschegesetz (AuA AT), Stand Juli 2025"
+    short_title: "BaFin AuA GwG"
+    regime: aml
+    layer: supervisory_practice
+    issuer: BaFin
+    language: de
+    format: pdf
+    url: "https://www.bafin.de/SharedDocs/Downloads/DE/Auslegungsentscheidung/dl-ae-auas-2025-gw.pdf?__blob=publicationFile&v=1"
+    display_url: https://www.bafin.de/SharedDocs/Downloads/DE/Auslegungsentscheidung/dl-ae-auas-2025-gw.html
+    notes: "General part (AT). BaFin's server rejects header-only requests; a normal download works."
+
+  - id: de-zag
+    title: "Gesetz über die Beaufsichtigung von Zahlungsdiensten (Zahlungsdiensteaufsichtsgesetz – ZAG)"
+    short_title: ZAG
+    regime: payments
+    layer: national_law
+    issuer: German federal legislator
+    language: de
+    format: gii_xml
+    url: https://www.gesetze-im-internet.de/zag_2018/xml.zip
+    display_url: https://www.gesetze-im-internet.de/zag_2018/

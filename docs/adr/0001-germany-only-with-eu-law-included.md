@@ -1,0 +1,3 @@
+# Firms supervised in Germany only, with EU law included as directly applicable law
+
+The Compliance Advisor answers for Firms supervised in Germany. EU regulations and their technical standards apply to these Firms directly, so they sit in the Corpus next to German acts and BaFin's supervisory practice, and the Regulatory Layer records where a Source comes from. There is no jurisdiction field anywhere: other countries would need one, plus retrieval filters and prompt changes. We accepted that in exchange for a simpler model and prompts that can assume German supervision. Decided in the planning session of 2026-10-20/21.
