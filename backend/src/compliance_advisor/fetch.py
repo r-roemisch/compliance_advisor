@@ -18,11 +18,17 @@ from .settings import get_settings
 
 USER_AGENT = "ComplianceAdvisor/0.1 (Turing College student project; non-commercial)"
 
-FILE_NAMES = {"html": "source.html", "gii_xml": "source.zip", "pdf": "source.pdf"}
+FILE_NAMES = {
+    "html": "source.html",
+    "gii_xml": "source.zip",
+    "pdf": "source.pdf",
+    "web_html": "source.html",
+}
 ACCEPT = {
     "html": "application/xhtml+xml, text/html;q=0.9",
     "gii_xml": "application/zip",
     "pdf": "application/pdf",
+    "web_html": "text/html",
 }
 # The EU Publications Office picks the language from ISO 639-2 codes (eng, deu).
 ACCEPT_LANGUAGE = {"en": "eng, en;q=0.9", "de": "deu, de;q=0.9"}
@@ -61,7 +67,7 @@ def check_content(source: Source, body: bytes) -> None:
         raise FetchRefused("expected a PDF, got something else")
     if source.format == "gii_xml" and not body.startswith(b"PK"):
         raise FetchRefused("expected a zip file, got something else")
-    if source.format == "html" and b"<" not in body[:2000]:
+    if source.format in ("html", "web_html") and b"<" not in body[:2000]:
         raise FetchRefused("expected HTML, got something else")
 
 
@@ -110,7 +116,7 @@ def main() -> None:
     failures = 0
     robots_cache: dict = {}
     with httpx.Client(
-        headers={"User-Agent": USER_AGENT}, follow_redirects=True, timeout=60.0
+        headers={"User-Agent": USER_AGENT}, follow_redirects=True, timeout=180.0
     ) as client:
         for source in sources:
             try:

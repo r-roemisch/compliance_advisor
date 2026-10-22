@@ -10,7 +10,7 @@ from pydantic import BaseModel, ValidationError
 Regime = Literal["dora", "aml", "payments", "insurance", "banking", "digital"]
 Layer = Literal["eu_level_1", "eu_level_2", "eu_level_3", "national_law", "supervisory_practice"]
 Language = Literal["en", "de"]
-Format = Literal["html", "gii_xml", "pdf"]
+Format = Literal["html", "gii_xml", "pdf", "web_html"]
 LegalStatus = Literal["in_force", "applies_later", "pending_proposal"]
 
 

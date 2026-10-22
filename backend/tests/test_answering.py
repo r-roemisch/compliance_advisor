@@ -7,8 +7,8 @@ from langchain_core.messages import AIMessage
 
 from compliance_advisor import api
 from compliance_advisor.answer import AnswerService, DatabaseError, cited_numbers
-from compliance_advisor.prompt import build_messages, format_passages
-from compliance_advisor.retriever import RetrievedPassage
+from compliance_advisor.prompt import build_messages, format_passages, question_language
+from compliance_advisor.retriever import RetrievedPassage, cap_per_source, named_provisions
 
 METADATA = {
     "passage_id": "eu-dora:0:abc",
@@ -112,3 +112,55 @@ def test_ask_reports_an_unreachable_database_as_503():
     response = TestClient(api.app).post("/api/ask", json={"question": "Major?"})
     assert response.status_code == 503
     assert response.json()["detail"] == "The database is not reachable"
+
+
+def test_cap_per_source_keeps_other_sources_in_the_top_k():
+    def hit(source, score):
+        return RetrievedPassage(Document(page_content="t", metadata={"source_id": source}), score)
+
+    ranked = [
+        hit("de-kwg", 0.9),
+        hit("de-kwg", 0.89),
+        hit("de-kwg", 0.88),
+        hit("de-kwg", 0.87),
+        hit("de-gwg", 0.86),
+        hit("de-kwg", 0.85),
+        hit("de-bafin", 0.84),
+    ]
+    chosen = cap_per_source(ranked, k=5, max_per_source=3)
+    assert [h.document.metadata["source_id"] for h in chosen] == [
+        "de-kwg",
+        "de-kwg",
+        "de-kwg",
+        "de-gwg",
+        "de-bafin",
+    ]
+    assert cap_per_source(ranked, k=3, max_per_source=0) == ranked[:3]
+
+
+def test_cap_per_source_fills_up_when_one_source_dominates():
+    def hit(source, score):
+        return RetrievedPassage(Document(page_content="t", metadata={"source_id": source}), score)
+
+    ranked = [hit("eu-ai-act", 0.9 - i / 100) for i in range(8)]
+    chosen = cap_per_source(ranked, k=6, max_per_source=3)
+    assert len(chosen) == 6 and chosen == ranked[:6]
+
+
+def test_question_language_is_detected():
+    assert question_language("Welche Aufgaben hat die Compliance-Funktion?") == "German"
+    assert question_language("Gilt die MaRisk für bedeutende Institute?") == "German"
+    assert question_language("What does § 10 GwG require for identification?") == "English"
+    assert question_language("When is an ICT incident major under DORA?") == "English"
+
+
+def test_named_provisions_are_recognised_in_the_index_form():
+    titles = ["KWG", "AI Act", "DORA", "GwG", "Solvency II"]
+    assert named_provisions("What does § 25a KWG require?", titles) == ["§ 25a KWG"]
+    assert named_provisions("Art. 6(2) AI Act and Article 17 of DORA", titles) == [
+        "Art. 6 AI Act",
+        "Art. 17 DORA",
+    ]
+    assert named_provisions("Was verlangt § 10 Abs. 1 GwG?", titles) == ["§ 10 GwG"]
+    assert named_provisions("Artikel 41 der Solvency II", titles) == ["Art. 41 Solvency II"]
+    assert named_provisions("What does DORA require?", titles) == []

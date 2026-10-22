@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     embedding_model: str = "openai/text-embedding-3-small"
     answer_model: str = "openai/gpt-6-luna"
     top_k: int = 6
+    max_per_source: int = 3  # at most this many Passages from one Source; 0 = no cap
+    candidates: int = 24  # Passages fetched before the cap is applied
     chunker: str = "provision"  # provision | fixed (the naive baseline)
     chunk_size: int = 1000  # fixed chunker
     chunk_overlap: int = 150  # fixed chunker

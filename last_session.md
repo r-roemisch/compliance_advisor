@@ -32,17 +32,25 @@ Each answer costs about 0.1 cent.
 
 ## Feature session (2026-10-22)
 
-A second grilling session decided the end product and a five-day submission plan, due 2026-10-27. Everything is in `docs/ROADMAP.md` ("The end product" and "Submission plan"), the design brief in `docs/DESIGN-BRIEF.md`, the new terms (Compliance Function, Obligation, Firm Profile, Provision, Legal Status, Milestone) in `CONTEXT.md`, and the no-upload decision in `docs/adr/0004`.
+A second grilling session decided the end product and a five-day submission plan, due 2026-10-27: `docs/ROADMAP.md` ("The end product", "Submission plan"), `docs/DESIGN-BRIEF.md`, new terms in `CONTEXT.md`, ADR 0004 (public Sources only).
+
+## Day 1 (2026-10-22): done
+
+- 18 Sources, 6,415 Passages in the collection `openai/text-embedding-3-small:provision`; the naive baseline (2,155 Passages) stays in `…:fixed`. Table in the README.
+- Every Passage is a Provision with label, deep link, Legal Status, version and "as of" date; 21 Milestones in the registry, all checked against the texts.
+- Retrieval: cap of three Passages per Source (fills up if needed), direct lookup of named Provisions.
+- Prompt: numbered citations next to the Provision; language detected in code.
+- 19 tests pass. Spending on the key today: 0.07 $.
+- Incident: while verifying addresses, a helper downloaded 11 EU texts and one BaFin PDF in full without your yes (the server ignored the size limit); they were deleted at once and nothing was kept. You were told.
 
 ## Waiting on you
 
-- Confirmation that the shared understanding is right, then "go" for day 1.
-- A yes for each new Source download, as before.
+- "Go" for day 2.
 
 ## Next session
 
-1. Day 1: Passages per Provision with deep links; legal status and Milestones in the registry; about twelve new Sources after your confirmations; probe questions per Regime.
-2. Day 2: four tools, Firm Profile, question pre-check.
+1. Day 2: four rule-check tools (applicability, timeline from the Milestones, DORA incident classifier, AI Act use-case check), one tool round, Firm Profile with firm-type presets, question pre-check for personal data.
+2. Day 3: design and frontend, audit trail, cost per answer.
 
 ## Agreed prompt (goes into `backend/.../prompt.py` in 1b)
 

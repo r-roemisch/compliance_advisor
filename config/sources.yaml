@@ -11,7 +11,7 @@
 #   layer         eu_level_1 | eu_level_2 | eu_level_3 | national_law | supervisory_practice
 #   issuer        who issued it; shown next to a citation
 #   language      en | de                                      (official language, ADR 0002)
-#   format        html | gii_xml | pdf                         (chooses the loader)
+#   format        html | gii_xml | pdf | web_html               (chooses the loader; web_html = BaFin web page)
 #   url           where compliance-advisor-fetch downloads the file
 #   display_url   the page a person opens to read the Source (optional; defaults to url).
 #                 Provision links build on it: EU acts append "#art_17", German acts replace the
@@ -117,3 +117,192 @@ sources:
     display_url: https://www.gesetze-im-internet.de/zag_2018/
     legal_status: in_force
     version: "last amended by Art. 17 G v. 25.3.2026"
+
+  # ======================================================================
+  # Added 2026-10-22: insurance, banking, digital, DORA reporting.
+  # EU texts in their latest consolidated version in force (CELEX 0…-date) unless noted.
+  # Identifiers and addresses verified 2026-10-22 (CELLAR SPARQL, gesetze-im-internet, bafin.de).
+  # ======================================================================
+
+  - id: eu-solvency2
+    title: "Directive 2009/138/EC on the taking-up and pursuit of the business of Insurance and Reinsurance (Solvency II)"
+    short_title: "Solvency II"
+    regime: insurance
+    layer: eu_level_1
+    issuer: European Parliament and Council
+    language: en
+    format: html
+    url: https://publications.europa.eu/resource/celex/02009L0138-20250117
+    display_url: https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02009L0138-20250117
+    legal_status: in_force
+    version: "consolidated 17.1.2025"
+    milestones:
+      - {date: 2016-01-01, what: "Applies, for most articles (Art. 311)"}
+      - {date: 2027-01-30, what: "Next consolidated version takes effect (later amendments)"}
+    notes: "A later consolidated version dated 30.1.2027 exists for amendments that apply from then."
+
+  - id: eu-solvency2-dr
+    title: "Commission Delegated Regulation (EU) 2015/35 supplementing Directive 2009/138/EC (Solvency II)"
+    short_title: "Delegated Regulation (EU) 2015/35"
+    regime: insurance
+    layer: eu_level_2
+    issuer: European Commission
+    language: en
+    format: html
+    url: https://publications.europa.eu/resource/celex/02015R0035-20241114
+    display_url: https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02015R0035-20241114
+    legal_status: in_force
+    version: "consolidated 14.11.2024"
+    notes: "Very large (about 50 MB of XHTML). Trim to the governance articles 258-275 if it crowds out other Sources."
+
+  - id: eu-idd
+    title: "Directive (EU) 2016/97 on insurance distribution (IDD)"
+    short_title: IDD
+    regime: insurance
+    layer: eu_level_1
+    issuer: European Parliament and Council
+    language: en
+    format: html
+    url: https://publications.europa.eu/resource/celex/02016L0097-20241009
+    display_url: https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02016L0097-20241009
+    legal_status: in_force
+    version: "consolidated 9.10.2024"
+    milestones:
+      - {date: 2018-10-01, what: "Member States apply the transposed rules (Art. 42)"}
+
+  - id: de-vag
+    title: "Gesetz über die Beaufsichtigung der Versicherungsunternehmen (Versicherungsaufsichtsgesetz – VAG)"
+    short_title: VAG
+    regime: insurance
+    layer: national_law
+    issuer: German federal legislator
+    language: de
+    format: gii_xml
+    url: https://www.gesetze-im-internet.de/vag_2016/xml.zip
+    display_url: https://www.gesetze-im-internet.de/vag_2016/
+    legal_status: in_force
+    version: "last amended by Art. 2 G v. 25.9.2026"
+
+  - id: de-bafin-mago
+    title: "BaFin Rundschreiben 09/2025 (VA) – Aufsichtsrechtliche Mindestanforderungen an die Geschäftsorganisation von Versicherungsunternehmen unter Solvabilität II (MaGo für SII-VU)"
+    short_title: MaGo
+    regime: insurance
+    layer: supervisory_practice
+    issuer: BaFin
+    language: de
+    format: web_html
+    url: https://www.bafin.de/SharedDocs/Veroeffentlichungen/DE/Rundschreiben/2025/rs_rundschreiben_09_25_va.html
+    legal_status: in_force
+    version: "Rundschreiben 09/2025 (VA)"
+    milestones:
+      - {date: 2025-10-14, what: "In force; Rundschreiben 02/2017 (VA) repealed (Rz. 12)"}
+    notes: "Published as a web page; no PDF found. Replaces Rundschreiben 2/2017 (VA)."
+
+  - id: eu-crr
+    title: "Regulation (EU) No 575/2013 on prudential requirements for credit institutions (CRR)"
+    short_title: CRR
+    regime: banking
+    layer: eu_level_1
+    issuer: European Parliament and Council
+    language: en
+    format: html
+    url: https://publications.europa.eu/resource/celex/02013R0575-20260626
+    display_url: https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02013R0575-20260626
+    legal_status: in_force
+    version: "consolidated 26.6.2026"
+    milestones:
+      - {date: 2014-01-01, what: "Applies (Art. 521)"}
+      - {date: 2027-01-01, what: "Next consolidated version takes effect (later amendments)"}
+    notes: "Large (about 13 MB). Trim to scope, operational risk and disclosure if it crowds out other Sources. A consolidated version dated 1.1.2027 exists for later amendments."
+
+  - id: eu-crd
+    title: "Directive 2013/36/EU on access to the activity of credit institutions and the prudential supervision of credit institutions (CRD)"
+    short_title: CRD
+    regime: banking
+    layer: eu_level_1
+    issuer: European Parliament and Council
+    language: en
+    format: html
+    url: https://publications.europa.eu/resource/celex/02013L0036-20260711
+    display_url: https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02013L0036-20260711
+    legal_status: in_force
+    version: "consolidated 11.7.2026"
+
+  - id: de-kwg
+    title: "Gesetz über das Kreditwesen (Kreditwesengesetz – KWG)"
+    short_title: KWG
+    regime: banking
+    layer: national_law
+    issuer: German federal legislator
+    language: de
+    format: gii_xml
+    url: https://www.gesetze-im-internet.de/kredwg/xml.zip
+    display_url: https://www.gesetze-im-internet.de/kredwg/
+    legal_status: in_force
+    version: "last amended by Art. 9 G v. 12.5.2026"
+
+  - id: de-bafin-marisk
+    title: "BaFin Rundschreiben 06/2026 (BA) – Mindestanforderungen an das Risikomanagement (MaRisk)"
+    short_title: MaRisk
+    regime: banking
+    layer: supervisory_practice
+    issuer: BaFin
+    language: de
+    format: pdf
+    url: "https://www.bafin.de/SharedDocs/Downloads/DE/Rundschreiben/dl_rs_0626_9_marisk.pdf?__blob=publicationFile&v=3"
+    display_url: https://www.bafin.de/SharedDocs/Downloads/DE/Rundschreiben/dl_rs_0626_9_marisk.html
+    legal_status: in_force
+    version: "Rundschreiben 06/2026 (BA), 9. MaRisk-Novelle, Stand 30.06.2026"
+    notes: "AT 2.1: does not apply to significant institutions under direct ECB supervision (Art. 6 SSM Regulation)."
+
+  - id: eu-ai-act
+    title: "Regulation (EU) 2024/1689 laying down harmonised rules on artificial intelligence (AI Act)"
+    short_title: "AI Act"
+    regime: digital
+    layer: eu_level_1
+    issuer: European Parliament and Council
+    language: en
+    format: html
+    url: https://publications.europa.eu/resource/celex/02024R1689-20260727
+    display_url: https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727
+    legal_status: in_force
+    version: "consolidated 27.7.2026"
+    milestones:
+      - {date: 2024-08-01, what: "Entry into force (Art. 113)"}
+      - {date: 2025-02-02, what: "Chapters I and II apply: general provisions, prohibited practices (Art. 113(a))"}
+      - {date: 2025-08-02, what: "General-purpose AI models, governance and penalties apply (Art. 113(b))"}
+      - {date: 2026-08-02, what: "Applies in general (Art. 113)"}
+      - {date: 2026-12-02, what: "Prohibitions in Art. 5(1)(ba), (bb), 5(1a) and (1b) apply (Art. 113(a))"}
+      - {date: 2027-12-02, what: "High-risk rules apply to Annex III systems, e.g. credit scoring, life and health insurance pricing (Art. 113(c)(i))"}
+      - {date: 2028-08-02, what: "High-risk rules apply to Annex I products (Art. 113(c)(ii))"}
+
+  - id: eu-gdpr
+    title: "Regulation (EU) 2016/679 – General Data Protection Regulation (GDPR)"
+    short_title: GDPR
+    regime: digital
+    layer: eu_level_1
+    issuer: European Parliament and Council
+    language: en
+    format: html
+    url: https://publications.europa.eu/resource/celex/02016R0679-20160504
+    display_url: https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02016R0679-20160504
+    legal_status: in_force
+    version: "consolidated 4.5.2016 (corrigendum)"
+    milestones:
+      - {date: 2018-05-25, what: "Applies (Art. 99)"}
+
+  - id: eu-dora-rts-reporting
+    title: "Commission Delegated Regulation (EU) 2025/301 specifying the content and time limits for the initial notification of, and intermediate and final report on, major ICT-related incidents (RTS under DORA)"
+    short_title: "Delegated Regulation (EU) 2025/301"
+    regime: dora
+    layer: eu_level_2
+    issuer: European Commission
+    language: en
+    format: html
+    url: https://publications.europa.eu/resource/celex/32025R0301
+    display_url: https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32025R0301
+    legal_status: in_force
+    version: "OJ L, 20.2.2025 (original text)"
+    milestones:
+      - {date: 2025-03-12, what: "Entry into force (Art. 7)"}
+    notes: "Specifies DORA Article 20: content and time limits of incident reports."

@@ -34,7 +34,15 @@ def _service() -> AnswerService:
     settings = get_settings()
     store = get_store(settings, get_embeddings(settings))
     return AnswerService(
-        Retriever(store), get_answer_model(settings), settings.answer_model, settings.top_k
+        Retriever(
+            store,
+            settings.max_per_source,
+            settings.candidates,
+            [s.short_title for s in load_sources(settings.sources_file)],
+        ),
+        get_answer_model(settings),
+        settings.answer_model,
+        settings.top_k,
     )
 
 

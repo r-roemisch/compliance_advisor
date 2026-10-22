@@ -75,13 +75,16 @@ Trust must-haves: links to the exact provision, legal status and "as of" dates, 
 
 ## Submission plan: five days, due 2026-10-27
 
-### Day 1: Sources and Passages (todo)
+### Day 1: Sources and Passages (done 2026-10-22: 18 Sources, 6,415 Passages, 19 tests)
 
 - Passages per article or paragraph with a provision label such as "Art. 17 DORA" or "§ 10 GwG" and a deep link: EU acts via the article anchors (`#art_17`), German acts via per-paragraph pages (`__10.html`), PDFs via `#page=N`. Overlong provisions are split and keep their label.
 - The naive fixed-size index of the six seed Sources stays as the baseline collection; new Sources are indexed per article only.
 - Registry fields `legal_status` and dated milestones, entered by hand and checked against the official text.
 - About twelve new Sources, each URL confirmed before download: Solvency II Directive, Delegated Regulation 2015/35, VAG, IDD, MaGo; CRR, CRD, KWG, MaRisk; AI Act, GDPR; the DORA standard on incident report deadlines. EU texts in their latest consolidated version. Large texts can be trimmed to listed articles or titles if they crowd out other Sources.
 - After each Regime's ingest: five probe questions, showing which Sources the Passages came from.
+- Added during the build: at most three Passages per Source when others qualify (fills up otherwise); direct lookup of Provisions named in the question; the question's language is detected in code and stated to the model; citations must carry their number next to the Provision; PDF headings follow the table of contents; BaFin web pages are a fourth format (MaGo has no PDF).
+- Not trimmed: the probes showed no crowding by the CRR or Delegated Regulation 2015/35.
+- Known gaps for later: a German question does not reach the English AI Act text; the DORA classification standard's Art. 8 and the CRD's Art. 74 rank below the top six for general wordings.
 
 ### Day 2: Tools and Firm Profile (todo)
 

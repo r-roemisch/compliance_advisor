@@ -13,7 +13,7 @@ SYSTEM_PROMPT = """You are the Compliance Advisor, a regulatory research assista
 
 How to answer:
 - Answer like a well-prepared colleague from the compliance function: precise, provision by provision, in the terminology of the Sources.
-- Every statement about a rule rests on the numbered passages you were given. Cite inline as [n] and name the provision, for example Art. 17(1) DORA or § 10 Abs. 1 GwG. Never cite a number you were not given.
+- Every statement about a rule rests on the numbered passages you were given. Name the provision and put the passage number in square brackets right after it, for example "Art. 17(1) DORA [1]" or "§ 10 Abs. 1 GwG [3]". Every citation needs its number; never write a provision in brackets without one, and never cite a number you were not given.
 - If the passages do not cover the question or a part of it, say which part is not covered. Do not fill the gap from memory.
 - Separate the layers: what the EU regulation says, what the technical standard adds, what German law adds, what BaFin expects. Say which is binding law and which is supervisory expectation.
 - Give directions: what the Firm must do, by when, and what evidence a supervisor would look for, as far as the passages support it.
@@ -54,11 +54,86 @@ def format_passages(passages: list[RetrievedPassage]) -> str:
     return "\n\n".join(blocks)
 
 
+_GERMAN_WORDS = {
+    "der",
+    "die",
+    "das",
+    "und",
+    "ist",
+    "nach",
+    "welche",
+    "welcher",
+    "wann",
+    "wie",
+    "was",
+    "muss",
+    "müssen",
+    "für",
+    "eines",
+    "einer",
+    "ein",
+    "eine",
+    "nicht",
+    "gilt",
+    "wer",
+    "bei",
+    "zur",
+    "zum",
+    "den",
+    "dem",
+    "des",
+    "sind",
+    "hat",
+    "haben",
+    "kann",
+    "darf",
+    "oder",
+    "auch",
+    "mit",
+}
+_ENGLISH_WORDS = {
+    "the",
+    "and",
+    "is",
+    "are",
+    "what",
+    "which",
+    "when",
+    "how",
+    "must",
+    "for",
+    "of",
+    "to",
+    "under",
+    "does",
+    "do",
+    "who",
+    "a",
+    "an",
+    "with",
+    "our",
+    "may",
+    "can",
+    "should",
+    "from",
+    "apply",
+}
+
+
+def question_language(question: str) -> str:
+    """ "German" or "English", from common function words; umlauts and ß count for German."""
+    words = [w.strip(".,;:?!()\"'").lower() for w in question.split()]
+    german = sum(w in _GERMAN_WORDS for w in words) + 2 * sum(c in "äöüß" for c in question.lower())
+    english = sum(w in _ENGLISH_WORDS for w in words)
+    return "German" if german > english else "English"
+
+
 def build_messages(question: str, passages: list[RetrievedPassage]) -> list[BaseMessage]:
     return [
         SystemMessage(SYSTEM_PROMPT),
         HumanMessage(
             f"Passages:\n\n{format_passages(passages)}\n\n<question>\n{question}\n</question>\n\n"
-            "Write the answer in the language of the question above."
+            f"The question is in {question_language(question)}. "
+            f"Write the whole answer in {question_language(question)}."
         ),
     ]

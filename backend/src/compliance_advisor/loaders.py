@@ -61,19 +61,26 @@ def _prepare(soup: BeautifulSoup) -> None:
         string.replace_with(re.sub(r"\s+", " ", string))
     for cell in soup.find_all(["td", "th"]):
         cell.append(" ")
+    # Consolidated texts put a point's number ("(1)") in its own column next to the text.
+    for marker in soup.find_all(class_="grid-list-column-1"):
+        marker.append(" ")
+        marker.name = "span"
     for block in soup.find_all(_BLOCKS):
         inside_cell = block.name != "tr" and block.find_parent(["td", "th"]) is not None
         block.append(" " if inside_cell else "\n")
 
 
+_AMENDMENT_MARKER = re.compile(r"[►▼]\s?[A-Z]\d*|◄")  # "►M3 … ◄" in consolidated texts
+
+
 def _eu_section(element) -> Section:
     unit_id = element["id"]
-    text = _tidy(element.get_text())
+    text = _tidy(_AMENDMENT_MARKER.sub("", element.get_text()))
     kind, number = unit_id.split("_", 1)
     number = number.replace("\xa0", " ").strip()
     if kind == "art":
-        subtitle = element.find(class_="oj-sti-art")
-        title = _tidy(subtitle.get_text()) if subtitle else ""
+        subtitle = element.find(class_="oj-sti-art") or element.find(class_="eli-title")
+        title = _tidy(_AMENDMENT_MARKER.sub("", subtitle.get_text())) if subtitle else ""
         label = f"Art. {number}"
     elif kind == "rct":
         title, label = "", f"Recital {number}"
@@ -85,7 +92,8 @@ def _eu_section(element) -> Section:
 
 
 def load_html(path: Path) -> list[Section]:
-    """EU acts as published in the Official Journal: one Section per recital, article, annex."""
+    """EU acts, original (Official Journal) or consolidated: one Section per recital, article
+    and annex. Both formats mark these units with the same ids ("art_17", "anx_I")."""
     soup = BeautifulSoup(path.read_bytes(), "xml")
     _prepare(soup)
     units = [e for e in soup.find_all(id=_EU_UNIT) if not e.find_parent(id=_EU_UNIT)]
@@ -265,7 +273,8 @@ def load_pdf(path: Path) -> list[Section]:
     label, title, page_of_section, buffer = "", "", 1, []
 
     def flush() -> None:
-        text = _tidy("\n".join(buffer))
+        # Words hyphenated at a line end ("kön-\nnen") are joined again.
+        text = _tidy(re.sub(r"(\w)-\n([a-zäöüß])", r"\1\2", "\n".join(buffer)))
         if text:
             shown = label or f"S. {page_of_section}"
             sections.append(Section(shown, title, f"#page={page_of_section}", text))
@@ -290,7 +299,47 @@ def load_pdf(path: Path) -> list[Section]:
     return sections
 
 
-LOADERS = {"html": load_html, "gii_xml": load_gii_xml, "pdf": load_pdf}
+# --- BaFin circulars published as web pages ------------------------------------------------
+
+_NUMBERED = re.compile(r"^(?P<number>\d{1,2}(?:\.\d{1,2}){0,4})\.?\s+(?P<title>\S.*)$")
+_MARK = "\u2063HEADING\u2063"
+
+
+def load_web_html(path: Path) -> list[Section]:
+    """BaFin web pages: one Section per numbered heading ("9.1.1 Allgemeines"). Headings carry
+    no anchors, so each Section links with a text fragment that scrolls to its heading."""
+    soup = BeautifulSoup(path.read_bytes(), "lxml")
+    main = soup.find("main") or soup.body
+    for noise in main.find_all(["nav", "form", "aside"]):
+        noise.decompose()
+    toc = main.find(id="headerToc")
+    if toc is not None:
+        container = toc.find_parent(["div", "section"]) or toc
+        container.decompose()
+    headings = []
+    for heading in main.find_all(["h2", "h3", "h4", "h5"]):
+        text = " ".join(heading.get_text(" ").split())
+        if _NUMBERED.match(text):
+            headings.append(text)
+            heading.replace_with(f"{_MARK}{len(headings) - 1}{_MARK}")
+    _prepare(main)
+    parts = main.get_text().split(_MARK)
+    sections = []
+    for index, body in zip(parts[1::2], parts[2::2]):
+        heading = headings[int(index)]
+        match = _NUMBERED.match(heading)
+        sections.append(
+            Section(
+                label=match["number"],
+                title=match["title"],
+                target="#:~:text=" + quote(heading),
+                text=_tidy(f"{heading}\n{body}"),
+            )
+        )
+    return sections
+
+
+LOADERS = {"html": load_html, "gii_xml": load_gii_xml, "pdf": load_pdf, "web_html": load_web_html}
 
 
 def link_for(source: Source, target: str) -> str:

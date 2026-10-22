@@ -8,7 +8,7 @@ Built step by step as a Turing College bootcamp project. The plan and the curren
 
 ## Status
 
-Step 1, a naive RAG, is done: six Sources, an index pipeline, a question-and-answer API and a bare page, running as three containers. Step 2 decides the layout and design.
+Step 1, a naive RAG, is done. Day 1 of the five-day submission plan in [`docs/ROADMAP.md`](docs/ROADMAP.md) is done too: 18 Sources cut into Provisions, each with a link to the exact article or paragraph, its Legal Status and dated Milestones. Tools, the Firm Profile and the designed interface follow on days 2 and 3.
 
 ## Quick start
 
@@ -30,14 +30,13 @@ A compliance team can only use an answer it can check. These are the Compliance 
 - **Public Sources only.** The Corpus holds published regulatory texts: EU acts, German acts and BaFin guidance. There is no upload, and no internal document of any Firm is stored.
 - **Official publishers.** Every Source is downloaded from its official publisher: the EU Publications Office, gesetze-im-internet.de or BaFin. The download date and a checksum of each file are kept next to it.
 - **Numbered Citations.** Every statement in an answer cites a numbered Passage. Each Passage shows its Source, issuer, Regulatory Layer and language.
-- **A link to the official text** next to every Passage.
+- **A link to the exact Provision** in the official text next to every Passage, such as Article 17 DORA or § 10 GwG.
+- **Legal Status and "as of" dates.** Each Source carries its Legal Status, version and dated Milestones, checked against its own text, and the date the app's copy was downloaded. Rules that apply only later, such as the AMLR, are marked so.
 - **"Not covered" instead of guessing.** When the Passages do not answer a question, the answer says which part is not covered instead of filling the gap from memory.
 - **No compliance verdicts.** The app explains what the rules require; it never says whether a specific Firm is compliant. A permanent notice below the chat says that the answers are not legal advice.
 
 **Planned**
 
-- **Links to the exact provision**, such as Article 17 DORA or § 10 GwG, instead of the whole act.
-- **"As of" dates.** Each Source shows its legal status and the date the app's copy was taken.
 - **Audit trail.** Every question and answer is stored with the exact Source versions used, and can be exported.
 - **"Not covered" made visible** in the interface, not only in the answer text.
 
@@ -78,20 +77,36 @@ The page in development: `cd frontend && npm install && npm run dev`, then http:
 
 Errors come back as `{"detail": "..."}`: 422 for invalid input, 502 when OpenRouter does not respond, 503 when the database is not reachable. The interactive API documentation is at http://localhost:8010/docs.
 
-## Seed Sources
+## Sources
 
-Step 1 indexes six Sources. They were chosen to cover three Regimes, four of the five Regulatory Layers, three file formats and both languages, so that every loader is exercised and later steps can measure how well answers stack the layers.
+18 Sources across six Regimes, 6,415 Passages. Each Passage is one Provision (an article, recital, annex, § or numbered guideline section), or part of a long one, and links to exactly that Provision in the official text. EU texts are the latest consolidated version in force where one exists in English.
 
-| Id | Source | Regulatory Layer | Format | Language | Why |
-|---|---|---|---|---|---|
-| `eu-dora` | Regulation (EU) 2022/2554, Digital Operational Resilience Act (DORA) | EU Level 1 | EUR-Lex HTML | EN | Applies to nearly every type of firm; most questions touch it |
-| `eu-dora-rts-incidents` | Delegated Regulation (EU) 2024/1772, classification of ICT-related incidents | EU Level 2 | EUR-Lex HTML | EN | Hangs off DORA Article 18; a "major incident" question needs both texts |
-| `eu-amlr` | Regulation (EU) 2024/1624, Anti-Money Laundering Regulation (AMLR) | EU Level 1 | EUR-Lex HTML | EN | The coming EU rulebook, applies from 10 July 2027; future law that must not be presented as current |
-| `de-gwg` | Geldwäschegesetz (GwG), German Money Laundering Act | National Law | gesetze-im-internet XML | DE | The AML act German firms live by today |
-| `de-bafin-aua-gwg` | BaFin, Auslegungs- und Anwendungshinweise zum GwG | Supervisory Practice | PDF | DE | BaFin's reading of the GwG; pairs with `de-gwg` |
-| `de-zag` | Zahlungsdiensteaufsichtsgesetz (ZAG), German Payment Services Supervision Act | National Law | gesetze-im-internet XML | DE | A second Regime, payments, and a second XML sample |
+| Regime | Source | Regulatory Layer | Version | Passages |
+|---|---|---|---|---|
+| DORA | Regulation (EU) 2022/2554 (DORA) | EU Level 1 | OJ L 333, 27.12.2022 | 224 |
+| DORA | Delegated Regulation (EU) 2024/1772, classification of ICT incidents | EU Level 2 | OJ 25.6.2024 | 32 |
+| DORA | Delegated Regulation (EU) 2025/301, content and time limits of incident reports | EU Level 2 | OJ 20.2.2025 | 17 |
+| AML | Regulation (EU) 2024/1624 (AMLR), applies from 10 July 2027 | EU Level 1 | OJ 19.6.2024 | 336 |
+| AML | Geldwäschegesetz (GwG) | National Law | amended 29.6.2026 | 172 |
+| AML | BaFin Auslegungs- und Anwendungshinweise zum GwG | Supervisory Practice | July 2025 | 201 |
+| Payments | Zahlungsdiensteaufsichtsgesetz (ZAG) | National Law | amended 25.3.2026 | 127 |
+| Insurance | Directive 2009/138/EC (Solvency II) | EU Level 1 | consolidated 17.1.2025 | 459 |
+| Insurance | Delegated Regulation (EU) 2015/35 (Solvency II) | EU Level 2 | consolidated 14.11.2024 | 1,453 |
+| Insurance | Directive (EU) 2016/97 (IDD) | EU Level 1 | consolidated 9.10.2024 | 80 |
+| Insurance | Versicherungsaufsichtsgesetz (VAG) | National Law | amended 25.9.2026 | 547 |
+| Insurance | BaFin Rundschreiben 09/2025 (VA), MaGo | Supervisory Practice | in force 14.10.2025 | 81 |
+| Banking | Regulation (EU) No 575/2013 (CRR) | EU Level 1 | consolidated 26.6.2026 | 1,273 |
+| Banking | Directive 2013/36/EU (CRD) | EU Level 1 | consolidated 11.7.2026 | 339 |
+| Banking | Kreditwesengesetz (KWG) | National Law | amended 12.5.2026 | 577 |
+| Banking | BaFin Rundschreiben 06/2026 (BA), MaRisk; not for ECB-supervised banks (AT 2.1) | Supervisory Practice | 30.6.2026 | 118 |
+| Digital | Regulation (EU) 2024/1689 (AI Act) | EU Level 1 | consolidated 27.7.2026 | 240 |
+| Digital | Regulation (EU) 2016/679 (GDPR) | EU Level 1 | consolidated 4.5.2016 | 139 |
 
-Adding a Source means adding an entry to `config/sources.yaml`. A new file format means one new loader function. EU Level 3 Sources, such as EBA guidelines, come with the corpus step of the roadmap.
+**How links reach a Provision.** EU acts: the article anchor on EUR-Lex (`#art_17`). German acts: the paragraph's own page on gesetze-im-internet.de (`__10.html`). BaFin PDFs: the page where the section starts (`#page=67`). BaFin web pages: a text fragment that scrolls to the section heading (`#:~:text=9.1.1 Allgemeines`).
+
+**How search works.** The six most similar Passages by cosine similarity, with at most three from one Source when others qualify, so one closely related act cannot fill every slot. A Provision named in the question, such as "§ 25a KWG" or "Art. 6 AI Act", is looked up directly and comes first. The naive fixed-size index of the first six Sources is kept as the baseline for the evaluation.
+
+Adding a Source means adding an entry to `config/sources.yaml`. Formats: `html` (EU acts, original or consolidated), `gii_xml` (German acts), `pdf` and `web_html` (BaFin).
 
 ---
 
