@@ -1,15 +1,22 @@
 """The Source Registry: reads and validates config/sources.yaml."""
 
+from datetime import date
 from pathlib import Path
 from typing import Literal
 
 import yaml
 from pydantic import BaseModel, ValidationError
 
-Regime = Literal["dora", "aml", "payments"]
+Regime = Literal["dora", "aml", "payments", "insurance", "banking", "digital"]
 Layer = Literal["eu_level_1", "eu_level_2", "eu_level_3", "national_law", "supervisory_practice"]
 Language = Literal["en", "de"]
 Format = Literal["html", "gii_xml", "pdf"]
+LegalStatus = Literal["in_force", "applies_later", "pending_proposal"]
+
+
+class Milestone(BaseModel, extra="forbid"):
+    date: date
+    what: str
 
 
 class Source(BaseModel, extra="forbid"):
@@ -23,6 +30,9 @@ class Source(BaseModel, extra="forbid"):
     format: Format
     url: str  # where the file is downloaded from
     display_url: str = ""  # the page a person opens to read the Source; defaults to url
+    legal_status: LegalStatus = "in_force"
+    version: str = ""  # which text: "OJ L 333, 27.12.2022" or "last amended 29.6.2026"
+    milestones: list[Milestone] = []
     notes: str = ""
 
     @property

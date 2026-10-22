@@ -7,18 +7,23 @@
 #   id            kebab-case, prefixed eu- or de-
 #   title         full official title
 #   short_title   the name used in citations, e.g. DORA, GwG
-#   regime        dora | aml | payments                        (grows with the corpus)
+#   regime        dora | aml | payments | insurance | banking | digital
 #   layer         eu_level_1 | eu_level_2 | eu_level_3 | national_law | supervisory_practice
 #   issuer        who issued it; shown next to a citation
 #   language      en | de                                      (official language, ADR 0002)
 #   format        html | gii_xml | pdf                         (chooses the loader)
 #   url           where compliance-advisor-fetch downloads the file
-#   display_url   the page a person opens to read the Source (optional; defaults to url)
+#   display_url   the page a person opens to read the Source (optional; defaults to url).
+#                 Provision links build on it: EU acts append "#art_17", German acts replace the
+#                 index page by "__10.html", PDFs append "#page=N" to `url`.
+#   legal_status  in_force | applies_later | pending_proposal   (CONTEXT.md: Legal Status)
+#   version       which text this is, e.g. "OJ L 333, 27.12.2022" or "last amended 29.6.2026"
+#   milestones    dated events, checked against the official text: [{date: 2025-01-17, what: "..."}]
 #   notes         anything worth knowing
 #
 # EU acts are downloaded from the EU Publications Office (publications.europa.eu), which serves
 # the same official text as EUR-Lex. EUR-Lex itself answers scripts with an empty challenge page.
-# Addresses checked 2026-10-21.
+# Addresses checked 2026-10-21. Dates and versions checked against the downloaded texts 2026-10-22.
 
 sources:
 
@@ -31,7 +36,12 @@ sources:
     language: en
     format: html
     url: https://publications.europa.eu/resource/celex/32022R2554
-    display_url: https://eur-lex.europa.eu/eli/reg/2022/2554/oj/eng
+    display_url: https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32022R2554
+    legal_status: in_force
+    version: "OJ L 333, 27.12.2022 (original text)"
+    milestones:
+      - {date: 2023-01-16, what: "Entry into force (Art. 64)"}
+      - {date: 2025-01-17, what: "Applies (Art. 64)"}
     notes: "Applies from 17 January 2025. Original text as published in the Official Journal."
 
   - id: eu-dora-rts-incidents
@@ -43,7 +53,11 @@ sources:
     language: en
     format: html
     url: https://publications.europa.eu/resource/celex/32024R1772
-    display_url: https://eur-lex.europa.eu/eli/reg_del/2024/1772/oj/eng
+    display_url: https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32024R1772
+    legal_status: in_force
+    version: "OJ L, 25.6.2024 (original text)"
+    milestones:
+      - {date: 2024-07-15, what: "Entry into force (Art. 13)"}
     notes: "Specifies DORA Article 18: when an ICT-related incident is major."
 
   - id: eu-amlr
@@ -55,8 +69,14 @@ sources:
     language: en
     format: html
     url: https://publications.europa.eu/resource/celex/32024R1624
-    display_url: https://eur-lex.europa.eu/eli/reg/2024/1624/oj/eng
-    notes: "Applies from 10 July 2027. Not yet applicable law; until then the GwG governs."
+    display_url: https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32024R1624
+    legal_status: applies_later
+    version: "OJ L, 19.6.2024 (original text)"
+    milestones:
+      - {date: 2024-07-09, what: "Entry into force (Art. 90)"}
+      - {date: 2027-07-10, what: "Applies (Art. 90)"}
+      - {date: 2029-07-10, what: "Applies to obliged entities in Art. 3(3)(n) and (o) (Art. 90)"}
+    notes: "Not yet applicable law; until it applies, the GwG governs."
 
   - id: de-gwg
     title: "Gesetz über das Aufspüren von Gewinnen aus schweren Straftaten (Geldwäschegesetz – GwG)"
@@ -68,6 +88,8 @@ sources:
     format: gii_xml
     url: https://www.gesetze-im-internet.de/gwg_2017/xml.zip
     display_url: https://www.gesetze-im-internet.de/gwg_2017/
+    legal_status: in_force
+    version: "last amended by Art. 12 Abs. 4 G v. 29.6.2026"
 
   - id: de-bafin-aua-gwg
     title: "BaFin – Auslegungs- und Anwendungshinweise zum Geldwäschegesetz (AuA AT), Stand Juli 2025"
@@ -79,6 +101,8 @@ sources:
     format: pdf
     url: "https://www.bafin.de/SharedDocs/Downloads/DE/Auslegungsentscheidung/dl-ae-auas-2025-gw.pdf?__blob=publicationFile&v=1"
     display_url: https://www.bafin.de/SharedDocs/Downloads/DE/Auslegungsentscheidung/dl-ae-auas-2025-gw.html
+    legal_status: in_force
+    version: "Stand Juli 2025"
     notes: "General part (AT). BaFin's server rejects header-only requests; a normal download works."
 
   - id: de-zag
@@ -91,3 +115,5 @@ sources:
     format: gii_xml
     url: https://www.gesetze-im-internet.de/zag_2018/xml.zip
     display_url: https://www.gesetze-im-internet.de/zag_2018/
+    legal_status: in_force
+    version: "last amended by Art. 17 G v. 25.3.2026"

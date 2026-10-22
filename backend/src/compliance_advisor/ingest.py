@@ -23,9 +23,13 @@ def main() -> None:
     parser.add_argument(
         "--rebuild", action="store_true", help="empty the whole collection first, then ingest"
     )
+    parser.add_argument("--chunker", choices=["provision", "fixed"], help="override CHUNKER")
     args = parser.parse_args()
 
     settings = get_settings()
+    if args.chunker:
+        settings = settings.model_copy(update={"chunker": args.chunker})
+    print(f"Collection: {settings.collection}")
     sources = select(load_sources(settings.sources_file), args.source)
 
     store = None
@@ -37,7 +41,7 @@ def main() -> None:
         if args.rebuild:
             store.delete_collection()
             store.create_collection()
-            print(f"Emptied collection {settings.embedding_model!r}.")
+            print(f"Emptied collection {settings.collection!r}.")
 
     failures = 0
     for source in sources:
@@ -47,7 +51,7 @@ def main() -> None:
             failures += 1
             print(f"{source.id}: skipped: {e}")
             continue
-        passages = chunk(loaded, settings.chunk_size, settings.chunk_overlap)
+        passages = chunk(loaded, source, settings)
         if not passages:
             failures += 1
             print(f"{source.id}: the loader found no text; check the downloaded file")
@@ -55,8 +59,9 @@ def main() -> None:
         average = sum(len(p.page_content) for p in passages) // len(passages)
         summary = f"{len(loaded.text):,} characters -> {len(passages)} Passages (avg {average})"
         if args.dry_run:
-            sample = passages[min(3, len(passages) - 1)].page_content[:300].replace("\n", " | ")
-            print(f"{source.id}: {summary}\n    sample: {sample}")
+            sample = passages[min(3, len(passages) - 1)]
+            label = sample.metadata.get("provision", "")
+            print(f"{source.id}: {summary}\n    sample {label}: {sample.page_content[:240]!r}")
             continue
         from .store import add_passages, delete_source
 

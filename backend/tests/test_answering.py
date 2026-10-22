@@ -19,7 +19,11 @@ METADATA = {
     "layer": "eu_level_1",
     "issuer": "European Parliament and Council",
     "language": "en",
-    "url": "https://eur-lex.europa.eu/eli/reg/2022/2554/oj/eng",
+    "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32022R2554",
+    "provision": "Art. 17 DORA",
+    "link": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32022R2554#art_17",
+    "legal_status": "in_force",
+    "as_of": "2026-10-21",
     "position": 0,
 }
 HITS = [
@@ -51,7 +55,8 @@ def client_with(model) -> TestClient:
 
 def test_prompt_numbers_passages_and_names_their_layer():
     text = format_passages(HITS)
-    assert '<passage n="1"' in text and '<passage n="2"' in text
+    assert '<passage n="1" provision="Art. 17 DORA"' in text and '<passage n="2"' in text
+    assert 'status="in force"' in text
     assert "EU Level 1" in text and 'issuer="European Parliament and Council"' in text
     messages = build_messages("When is an incident major?", HITS)
     assert "Do not add disclaimers" in messages[0].content
@@ -78,6 +83,8 @@ def test_ask_returns_the_agreed_shape():
     assert set(body) == {"question", "answer", "passages", "cited", "model", "usage", "disclaimer"}
     assert body["cited"] == [1]
     assert body["passages"][0]["n"] == 1 and body["passages"][0]["score"] == 0.81
+    assert body["passages"][0]["provision"] == "Art. 17 DORA"
+    assert body["passages"][0]["link"].endswith("#art_17")
     assert body["usage"] == {"input_tokens": 900, "output_tokens": 40}
     assert "not legal advice" in body["disclaimer"]
 

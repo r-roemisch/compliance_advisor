@@ -23,7 +23,13 @@ class PassageOut(BaseModel):
     layer: str
     issuer: str
     language: str
-    url: str
+    url: str  # the Source's reading page
+    provision: str = ""  # "Art. 17 DORA", "§ 10 GwG"; empty for the naive baseline index
+    provision_title: str = ""
+    link: str = ""  # opens exactly this Provision in the official text
+    legal_status: str = "in_force"
+    version: str = ""
+    as_of: str = ""  # date the app's copy of the Source was downloaded
     score: float
     text: str
 
@@ -52,6 +58,10 @@ class SourceOut(BaseModel):
     issuer: str
     language: str
     url: str
+    legal_status: str
+    version: str
+    milestones: list[dict]
+    as_of: str
     passages: int
 
 

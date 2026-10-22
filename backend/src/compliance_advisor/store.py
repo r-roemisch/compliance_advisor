@@ -13,7 +13,7 @@ from .settings import Settings
 def get_store(settings: Settings, embeddings: Embeddings) -> PGVector:
     return PGVector(
         embeddings=embeddings,
-        collection_name=settings.embedding_model,  # a new model gets its own collection
+        collection_name=settings.collection,  # one per embedding model and chunker
         connection=settings.database_url,
         use_jsonb=True,
     )

@@ -1,5 +1,6 @@
 """The HTTP API: ask a question, check health, list the Corpus."""
 
+import json
 import logging
 from functools import lru_cache
 from typing import Annotated
@@ -54,12 +55,21 @@ def passage_counts() -> dict[str, int]:
     )
     try:
         with _engine().connect() as connection:
-            rows = connection.execute(query, {"collection": get_settings().embedding_model})
+            rows = connection.execute(query, {"collection": get_settings().collection})
             return {source_id: count for source_id, count in rows}
     except SQLAlchemyError as e:
         if "does not exist" in str(e):  # nothing ingested yet
             return {}
         raise DatabaseError("the database is not reachable") from e
+
+
+def fetched_on(raw_dir, source_id: str) -> str:
+    """The date the app's copy of a Source was downloaded, from data/raw/<id>/meta.json."""
+    meta = raw_dir / source_id / "meta.json"
+    try:
+        return json.loads(meta.read_text())["fetched_at"][:10]
+    except (OSError, ValueError, KeyError):
+        return ""
 
 
 @app.exception_handler(RequestValidationError)
@@ -106,8 +116,20 @@ def sources() -> SourcesResponse:
         sources=[
             SourceOut(
                 **s.model_dump(
-                    include={"id", "title", "short_title", "regime", "layer", "issuer", "language"}
+                    include={
+                        "id",
+                        "title",
+                        "short_title",
+                        "regime",
+                        "layer",
+                        "issuer",
+                        "language",
+                        "legal_status",
+                        "version",
+                    }
                 ),
+                milestones=[m.model_dump(mode="json") for m in s.milestones],
+                as_of=fetched_on(settings.raw_dir, s.id),
                 url=s.link,
                 passages=counts.get(s.id, 0),
             )

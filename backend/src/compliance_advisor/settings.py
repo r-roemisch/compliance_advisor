@@ -19,13 +19,21 @@ class Settings(BaseSettings):
     embedding_model: str = "openai/text-embedding-3-small"
     answer_model: str = "openai/gpt-6-luna"
     top_k: int = 6
-    chunk_size: int = 1000
-    chunk_overlap: int = 150
+    chunker: str = "provision"  # provision | fixed (the naive baseline)
+    chunk_size: int = 1000  # fixed chunker
+    chunk_overlap: int = 150  # fixed chunker
+    provision_max_chars: int = 2500  # longer Provisions are split into parts
+    provision_overlap: int = 200
     api_host: str = "127.0.0.1"
     api_port: int = 8010
 
     config_dir: Path = PROJECT_ROOT / "config"
     data_dir: Path = PROJECT_ROOT / "data"
+
+    @property
+    def collection(self) -> str:
+        """One collection per embedding model and chunker, so indexes never mix."""
+        return f"{self.embedding_model}:{self.chunker}"
 
     @property
     def sources_file(self) -> Path:

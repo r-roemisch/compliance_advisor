@@ -84,9 +84,9 @@ class AnswerService:
                     score=hit.score,
                     text=hit.document.page_content,
                     **{
-                        k: hit.document.metadata[k]
-                        for k in PassageOut.model_fields
-                        if k not in ("n", "score", "text")
+                        k: v
+                        for k, v in hit.document.metadata.items()
+                        if k in PassageOut.model_fields and k not in ("n", "score", "text")
                     },
                 )
                 for n, hit in enumerate(passages, start=1)
