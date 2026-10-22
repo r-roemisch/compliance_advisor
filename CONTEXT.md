@@ -72,6 +72,10 @@ _Avoid_: Tier, hierarchy, level (on its own), jurisdiction
 
 ### Answers
 
+**Rule Check**:
+A check written in code that applies rules taken from the Sources to facts the Compliance Officer stated, and names the Provision that decides its result. It never fills in a missing fact; it reports it as missing.
+_Avoid_: AI check, calculator, tool (in domain talk)
+
 **Guidance**:
 What a provision requires, whom it applies to, what the supervisor expects and the steps Firms typically take, stated from the Sources. It is never a judgement on a specific Firm's case.
 _Avoid_: Legal advice, opinion, recommendation

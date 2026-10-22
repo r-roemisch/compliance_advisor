@@ -6,7 +6,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import type { AskResponse, SourcesResponse } from "@/lib/types";
+import type { AskResponse, Preset, SourcesResponse } from "@/lib/types";
 
 const NOTICE =
   "This is regulatory information generated from the indexed Sources, not legal advice. " +
@@ -27,11 +27,16 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [sources, setSources] = useState<SourcesResponse | null>(null);
+  const [presets, setPresets] = useState<Preset[]>([]);
+  const [presetId, setPresetId] = useState("");
 
   useEffect(() => {
     fetch("/api/sources")
       .then(async (r) => (r.ok ? setSources(await r.json()) : setError(await readError(r))))
       .catch(() => setError("The backend is not reachable"));
+    fetch("/api/profiles")
+      .then(async (r) => r.ok && setPresets((await r.json()).presets))
+      .catch(() => undefined);
   }, []);
 
   async function ask(event: FormEvent) {
@@ -43,7 +48,10 @@ export default function Home() {
       const response = await fetch("/api/ask", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({
+          question,
+          profile: presets.find((p) => p.id === presetId)?.profile ?? null,
+        }),
       });
       if (response.ok) setResult(await response.json());
       else setError(await readError(response));
@@ -71,6 +79,22 @@ export default function Home() {
           placeholder="When is an ICT-related incident major under DORA?"
           className="rounded border p-2"
         />
+        <label htmlFor="profile" className="text-sm">
+          Firm Profile
+        </label>
+        <select
+          id="profile"
+          value={presetId}
+          onChange={(e) => setPresetId(e.target.value)}
+          className="self-start rounded border p-1"
+        >
+          <option value="">No Firm Profile</option>
+          {presets.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.label.en}
+            </option>
+          ))}
+        </select>
         <button
           type="submit"
           disabled={loading || question.trim().length < 3}
@@ -85,6 +109,11 @@ export default function Home() {
 
       {result && (
         <section className="flex flex-col gap-4">
+          {result.redactions.length > 0 && (
+            <p role="note" className="text-sm">
+              Removed before sending: {result.redactions.join(", ")}.
+            </p>
+          )}
           <h2 className="text-lg font-semibold">Answer</h2>
           <div className="prose-like flex flex-col gap-2">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.answer}</ReactMarkdown>
@@ -93,15 +122,33 @@ export default function Home() {
             {result.model} · {result.usage.input_tokens} tokens in, {result.usage.output_tokens} tokens out
           </p>
 
+          {result.tools.length > 0 && (
+            <>
+              <h2 className="text-lg font-semibold">Rule checks</h2>
+              {result.tools.map((t, i) => (
+                <details key={i} className="rounded border p-2 text-sm">
+                  <summary>
+                    {t.name}:{" "}
+                    {String(t.result.major ?? t.result.risk_class ?? "")}
+                  </summary>
+                  <pre className="overflow-x-auto whitespace-pre-wrap text-xs">
+                    {JSON.stringify(t.result, null, 2)}
+                  </pre>
+                </details>
+              ))}
+            </>
+          )}
+
           <h2 className="text-lg font-semibold">Passages</h2>
           <ol className="flex flex-col gap-3">
             {result.passages.map((p) => (
               <li key={p.passage_id} className="rounded border p-2 text-sm">
                 <div>
-                  <strong>[{p.n}]</strong> {p.short_title} · {p.issuer} · {p.layer} · score {p.score.toFixed(2)}
+                  <strong>[{p.n}]</strong> {p.provision || p.short_title} · {p.issuer} · {p.layer} ·{" "}
+                  {p.legal_status} · as of {p.as_of} · score {p.score.toFixed(2)}
                   {result.cited.includes(p.n) ? " · cited" : " · not cited"}{" "}
-                  <a href={p.url} target="_blank" rel="noreferrer" className="underline">
-                    open Source
+                  <a href={p.link || p.url} target="_blank" rel="noreferrer" className="underline">
+                    open provision
                   </a>
                 </div>
                 <p className="mt-1 whitespace-pre-line">{p.text}</p>

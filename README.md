@@ -8,7 +8,7 @@ Built step by step as a Turing College bootcamp project. The plan and the curren
 
 ## Status
 
-Step 1, a naive RAG, is done. Day 1 of the five-day submission plan in [`docs/ROADMAP.md`](docs/ROADMAP.md) is done too: 18 Sources cut into Provisions, each with a link to the exact article or paragraph, its Legal Status and dated Milestones. Tools, the Firm Profile and the designed interface follow on days 2 and 3.
+Step 1, a naive RAG, is done. Day 1 of the five-day submission plan in [`docs/ROADMAP.md`](docs/ROADMAP.md) is done too: 18 Sources cut into Provisions, each with a link to the exact article or paragraph, its Legal Status and dated Milestones. Day 2 added four Rule Checks the model can call, the Firm Profile with presets, and a pre-check that removes personal data. The designed interface follows on day 3.
 
 ## Quick start
 
@@ -40,7 +40,7 @@ A compliance team can only use an answer it can check. These are the Compliance 
 - **Audit trail.** Every question and answer is stored with the exact Source versions used, and can be exported.
 - **"Not covered" made visible** in the interface, not only in the answer text.
 
-**What leaves the app.** The question, together with the retrieved Passages, is sent to the Answer Model through OpenRouter, an external service. Do not enter confidential Firm data or Customer data in a question.
+**What leaves the app.** The question, together with the retrieved Passages and the Firm Profile, is sent to the Answer Model through OpenRouter, an external service. A pre-check removes IBANs, email addresses and phone numbers first; names and other details are not detected. Do not enter confidential Firm data or Customer data in a question.
 
 ## Getting the Sources in
 
@@ -71,11 +71,27 @@ The page in development: `cd frontend && npm install && npm run dev`, then http:
 
 | Endpoint | Does |
 |---|---|
-| `POST /api/ask` | Question in (3 to 2000 characters, optional `top_k`); answer with numbered Passages, the cited numbers, model, token usage and the notice out |
+| `POST /api/ask` | Question in (3 to 2000 characters, optional `top_k` and `profile`); answer with numbered Passages, cited numbers, Rule Check results, what the pre-check removed, model, token usage and the notice out |
 | `GET /api/health` | Says whether the backend runs and the database is reachable |
-| `GET /api/sources` | Lists the Sources and how many Passages each has in the Corpus |
+| `GET /api/sources` | Lists the Sources with Legal Status, version, Milestones, "as of" date and Passage count |
+| `GET /api/profiles` | Lists the Firm Profile presets |
 
 Errors come back as `{"detail": "..."}`: 422 for invalid input, 502 when OpenRouter does not respond, 503 when the database is not reachable. The interactive API documentation is at http://localhost:8010/docs.
+
+## Rule checks and the Firm Profile
+
+The Answer Model may call four Rule Checks once before it answers. Each is plain code that applies rules taken from the Sources, names the Provision that decides its result, and lists missing facts instead of assuming them.
+
+| Rule check | Answers | Built on |
+|---|---|---|
+| `check_applicability` | Which Regimes apply to the Firm, and why | DORA Art. 2, § 2 GwG, AMLR Art. 3 and 90, § 1 ZAG, Solvency II Art. 4, MaRisk AT 2.1, AI Act Art. 4 and Annex III |
+| `compliance_timeline` | Dated Milestones, past and upcoming | the Milestones in `config/sources.yaml` |
+| `classify_dora_incident` | Whether an ICT incident is major, and the reporting deadlines | Delegated Regulation 2024/1772 Art. 8 and 9; Delegated Regulation 2025/301 Art. 5; DORA Art. 19 |
+| `check_ai_act_use_case` | Risk class of an AI use and the resulting duties | AI Act Art. 4, 6, 26, 27, 50, 113 and Annex III |
+
+The **Firm Profile** (firm type, size class, customers, activities) travels with each question and shapes the Rule Checks. `GET /api/profiles` lists presets that describe firm types, never real companies: insurance group, reinsurer, life insurer, significant bank, less significant bank, payment institution.
+
+The **pre-check** removes IBANs, email addresses and phone numbers from a question before anything leaves the app, and the response says what was removed. Names are not detected; do not enter them.
 
 ## Sources
 

@@ -86,13 +86,15 @@ Trust must-haves: links to the exact provision, legal status and "as of" dates, 
 - Not trimmed: the probes showed no crowding by the CRR or Delegated Regulation 2015/35.
 - Known gaps for later: a German question does not reach the English AI Act text; the DORA classification standard's Art. 8 and the CRD's Art. 74 rank below the top six for general wordings.
 
-### Day 2: Tools and Firm Profile (todo)
+### Day 2: Tools and Firm Profile (done 2026-10-22: four Rule Checks, six presets, pre-check, 30 tests)
 
 - Four rule-check tools written in code: applicability check, compliance timeline, DORA incident classifier, AI Act use-case check. Each result names the provision that decides it.
 - One tool round: the model may call tools once, then answers (at most two model calls).
 - Firm Profile: firm type, size class, activities; kept in the browser; presets by firm type only.
 - Question pre-check: removes IBANs, email addresses and phone numbers before anything leaves the app, and says so.
 - Delivers H2 in full.
+- Added during the build: every rule was read from the Sources' own text first (DORA Art. 2, RTS 2024/1772 Art. 1-9, RTS 2025/301 Art. 5, § 2 GwG, AMLR Art. 2-3, § 1 ZAG, Solvency II Art. 4, MaRisk AT 2.1, AI Act Art. 4, 6, 26, 27, 50, Annex III). Tool results link to the indexed Provision. The bare page got a preset choice, rule-check cards and the pre-check notice, to try the day before the design.
+- Seen in live tests: the model passes only stated facts, so an incident question that does not say whether critical services were affected gets "undetermined" and a list of missing facts. Names are not removed by the pre-check (agreed scope: IBAN, email, phone).
 
 ### Day 3: Design and frontend (todo)
 

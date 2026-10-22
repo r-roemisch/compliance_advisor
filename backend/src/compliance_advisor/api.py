@@ -14,12 +14,14 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from .answer import AnswerService, DatabaseError, UpstreamError, get_answer_model
 from .embeddings import get_embeddings
+from .profile import PRESETS, FirmProfile
 from .prompt import DISCLAIMER
 from .registry import load_sources
 from .retriever import Retriever
 from .schemas import AskRequest, AskResponse, SourceOut, SourcesResponse
 from .settings import get_settings
 from .store import get_store
+from .tools import ProvisionLinks, make_tools
 
 app = FastAPI(title="Compliance Advisor", description=DISCLAIMER)
 
@@ -27,6 +29,29 @@ app = FastAPI(title="Compliance Advisor", description=DISCLAIMER)
 @lru_cache
 def _engine():
     return create_engine(get_settings().database_url, pool_pre_ping=True)
+
+
+@lru_cache(maxsize=512)
+def provision_link(label: str) -> str | None:
+    """The indexed link of a Provision label, such as "AT 2.1 MaRisk" -> its PDF page."""
+    query = text(
+        "select e.cmetadata->>'link' from langchain_pg_embedding e "
+        "join langchain_pg_collection c on c.uuid = e.collection_id "
+        "where c.name = :collection and e.cmetadata->>'provision' = :label limit 1"
+    )
+    try:
+        with _engine().connect() as connection:
+            row = connection.execute(
+                query, {"collection": get_settings().collection, "label": label}
+            ).first()
+            return row[0] if row else None
+    except SQLAlchemyError:
+        return None
+
+
+def tool_factory(profile: FirmProfile | None, today):
+    sources = load_sources(get_settings().sources_file)
+    return make_tools(profile, sources, ProvisionLinks(sources, provision_link), today)
 
 
 @lru_cache
@@ -43,6 +68,7 @@ def _service() -> AnswerService:
         get_answer_model(settings),
         settings.answer_model,
         settings.top_k,
+        tool_factory,
     )
 
 
@@ -103,7 +129,13 @@ async def database_down(request: Request, exc: DatabaseError) -> JSONResponse:
 def ask(
     request: AskRequest, service: Annotated[AnswerService, Depends(get_service)]
 ) -> AskResponse:
-    return service.ask(request.question, request.top_k)
+    return service.ask(request.question, request.top_k, request.profile)
+
+
+@app.get("/api/profiles")
+def profiles() -> dict:
+    """Firm Profile presets, by firm type only."""
+    return {"presets": [p.model_dump() for p in PRESETS]}
 
 
 @app.get("/api/health")

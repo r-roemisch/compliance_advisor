@@ -80,7 +80,18 @@ def test_ask_returns_the_agreed_shape():
     response = client_with(FakeModel(reply)).post("/api/ask", json={"question": "Major?"})
     assert response.status_code == 200
     body = response.json()
-    assert set(body) == {"question", "answer", "passages", "cited", "model", "usage", "disclaimer"}
+    assert set(body) == {
+        "question",
+        "redactions",
+        "answer",
+        "passages",
+        "cited",
+        "tools",
+        "model",
+        "usage",
+        "disclaimer",
+    }
+    assert body["tools"] == [] and body["redactions"] == []
     assert body["cited"] == [1]
     assert body["passages"][0]["n"] == 1 and body["passages"][0]["score"] == 0.81
     assert body["passages"][0]["provision"] == "Art. 17 DORA"

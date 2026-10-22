@@ -2,10 +2,13 @@
 
 from pydantic import BaseModel, Field, field_validator
 
+from .profile import FirmProfile
+
 
 class AskRequest(BaseModel):
     question: str = Field(min_length=3, max_length=2000)
     top_k: int | None = Field(default=None, ge=1, le=20)
+    profile: FirmProfile | None = None
 
     @field_validator("question", mode="before")
     @classmethod
@@ -39,11 +42,19 @@ class Usage(BaseModel):
     output_tokens: int = 0
 
 
+class ToolRun(BaseModel):
+    name: str
+    arguments: dict
+    result: dict
+
+
 class AskResponse(BaseModel):
-    question: str
+    question: str  # as sent to the model, after the pre-check
+    redactions: list[str] = []  # kinds of personal data the pre-check removed
     answer: str
     passages: list[PassageOut]
     cited: list[int]
+    tools: list[ToolRun] = []
     model: str
     usage: Usage
     disclaimer: str

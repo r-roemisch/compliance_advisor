@@ -43,14 +43,23 @@ A second grilling session decided the end product and a five-day submission plan
 - 19 tests pass. Spending on the key today: 0.07 $.
 - Incident: while verifying addresses, a helper downloaded 11 EU texts and one BaFin PDF in full without your yes (the server ignored the size limit); they were deleted at once and nothing was kept. You were told.
 
+## Day 2 (2026-10-22): done
+
+- Four Rule Checks in `backend/src/compliance_advisor/tools.py`, called by the model in one round (at most two model calls): applicability, timeline, DORA incident classifier, AI Act use-case check. All rules taken from the Sources' text; results name and link the deciding Provision; missing facts are listed, never assumed.
+- Firm Profile (`profile.py`) with six firm-type presets, `GET /api/profiles`; the profile travels with each question.
+- Pre-check (`precheck.py`): IBAN, email, phone removed before anything is sent; the response lists what was removed.
+- Live tests with GPT-6 Luna: all four tools called correctly; incident deadline computed (14:00 for awareness 08:00, classification 10:00); German AI question answered in German with "Hochrisiko" and the missing facts. About 0.2 cent per answer with tools (8,000-10,000 input tokens).
+- 30 tests pass.
+
 ## Waiting on you
 
-- "Go" for day 2.
+- "Go" for day 3, and the design: run the design tool with `docs/DESIGN-BRIEF.md`, or tell me to build the layout from the brief directly.
+- The open choice from earlier: should one Rule Check (most likely the incident classifier) also get its own form?
 
 ## Next session
 
-1. Day 2: four rule-check tools (applicability, timeline from the Milestones, DORA incident classifier, AI Act use-case check), one tool round, Firm Profile with firm-type presets, question pre-check for personal data.
-2. Day 3: design and frontend, audit trail, cost per answer.
+1. Day 3: design and frontend (German/English, trust elements, rule-check cards, history and audit trail, export, cost per answer, model choice with an EU model).
+2. Day 4: Extract Obligations, timeline view, Golden Set and evaluation.
 
 ## Agreed prompt (goes into `backend/.../prompt.py` in 1b)
 
