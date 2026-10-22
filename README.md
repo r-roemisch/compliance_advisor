@@ -8,7 +8,7 @@ Built step by step as a Turing College bootcamp project. The plan and the curren
 
 ## Status
 
-Step 1, a naive RAG, is done. Day 1 of the five-day submission plan in [`docs/ROADMAP.md`](docs/ROADMAP.md) is done too: 18 Sources cut into Provisions, each with a link to the exact article or paragraph, its Legal Status and dated Milestones. Day 2 added four Rule Checks the model can call, the Firm Profile with presets, and a pre-check that removes personal data. The designed interface follows on day 3.
+Step 1, a naive RAG, is done. Day 1 of the five-day submission plan in [`docs/ROADMAP.md`](docs/ROADMAP.md) is done too: 18 Sources cut into Provisions, each with a link to the exact article or paragraph, its Legal Status and dated Milestones. Day 2 added four Rule Checks the model can call, the Firm Profile with presets, and a pre-check that removes personal data. Day 3 added the designed interface in German and English, the audit trail with history and export, cost per answer and a choice of Answer Model including one hosted in the EU.
 
 ## Quick start
 
@@ -33,12 +33,12 @@ A compliance team can only use an answer it can check. These are the Compliance 
 - **A link to the exact Provision** in the official text next to every Passage, such as Article 17 DORA or § 10 GwG.
 - **Legal Status and "as of" dates.** Each Source carries its Legal Status, version and dated Milestones, checked against its own text, and the date the app's copy was downloaded. Rules that apply only later, such as the AMLR, are marked so.
 - **"Not covered" instead of guessing.** When the Passages do not answer a question, the answer says which part is not covered instead of filling the gap from memory.
+- **Audit trail.** Every answer is stored with the exact Source versions it used (download date and SHA-256 checksum) and can be exported. There are no user accounts yet, so everyone using one installation sees the same history.
+- **Coverage made visible.** When the Sources answer a question only in part or not at all, the interface says so above the answer.
+- **An EU-hosted model** can be chosen: Mistral Large 4, pinned to Mistral AI's own servers.
+- **No calls to third parties from the browser.** Fonts are served by the app itself.
 - **No compliance verdicts.** The app explains what the rules require; it never says whether a specific Firm is compliant. A permanent notice below the chat says that the answers are not legal advice.
 
-**Planned**
-
-- **Audit trail.** Every question and answer is stored with the exact Source versions used, and can be exported.
-- **"Not covered" made visible** in the interface, not only in the answer text.
 
 **What leaves the app.** The question, together with the retrieved Passages and the Firm Profile, is sent to the Answer Model through OpenRouter, an external service. A pre-check removes IBANs, email addresses and phone numbers first; names and other details are not detected. Do not enter confidential Firm data or Customer data in a question.
 
@@ -75,8 +75,27 @@ The page in development: `cd frontend && npm install && npm run dev`, then http:
 | `GET /api/health` | Says whether the backend runs and the database is reachable |
 | `GET /api/sources` | Lists the Sources with Legal Status, version, Milestones, "as of" date and Passage count |
 | `GET /api/profiles` | Lists the Firm Profile presets |
+| `POST /api/ask/stream` | Same as `/api/ask`, as server-sent events: one per step, then the result |
+| `GET /api/models` | Lists the Answer Models offered (from `config/models.yaml`) |
+| `GET /api/history` | Lists stored answers, newest first |
+| `GET /api/history/{id}` | One stored answer with its Firm Profile and Source versions |
+| `GET /api/history/{id}/export?format=md\|json` | Downloads one stored answer as Markdown or JSON |
 
 Errors come back as `{"detail": "..."}`: 422 for invalid input, 502 when OpenRouter does not respond, 503 when the database is not reachable. The interactive API documentation is at http://localhost:8010/docs.
+
+## The interface
+
+Open http://localhost:3010. German is the default; English is one switch away, and the theme follows the system or can be set to light or dark.
+
+- **Ask** a question; the steps the backend is working on appear as they happen (searching the Sources, analysing the question, running rule checks, writing the answer).
+- **Read the answer** with Citation chips. Clicking a chip highlights its Passage beside the answer; Passages show their Provision, Regulatory Layer, Legal Status, "as of" date and a link to the exact Provision.
+- **The layer glyph** next to each Passage shows where it sits in the stack, from EU Level 1 at the top to BaFin practice at the bottom; binding law is drawn solid, supervisory expectation outlined. Below the answer, a strip shows which layers the answer drew on.
+- **Coverage** is shown when the Sources answer a question only in part or not at all.
+- **Rule checks** appear as cards below the answer.
+- **Firm Profile**: set it in the header, from a preset or field by field. It is stored in this browser only.
+- **Model**: GPT-6 Luna (default), Mistral Large 4 hosted in the EU by Mistral AI, or Claude Sonnet 5.5. The choice list lives in `config/models.yaml`.
+- **History**: every answer is stored with the exact Source versions it used (download date and checksum) and can be reopened, exported as Markdown or JSON, or printed as PDF.
+- **Cost**: tokens and the cost OpenRouter reports are shown under each answer.
 
 ## Rule checks and the Firm Profile
 

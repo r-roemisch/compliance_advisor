@@ -1,0 +1,129 @@
+"""Audit trail: every answer is stored with the exact Source versions it used."""
+
+import json
+import uuid
+from datetime import UTC, datetime
+from pathlib import Path
+
+from sqlalchemy import Column, DateTime, MetaData, String, Table, Text, select
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.engine import Engine
+
+from .schemas import AskResponse
+
+metadata = MetaData()
+answers = Table(
+    "answers",
+    metadata,
+    Column("id", String(36), primary_key=True),
+    Column("created_at", DateTime(timezone=True), nullable=False, index=True),
+    Column("question", Text, nullable=False),  # after the pre-check
+    Column("profile", JSONB),
+    Column("model", String(200), nullable=False),
+    Column("response", JSONB, nullable=False),  # the full response as the interface saw it
+    Column("source_versions", JSONB, nullable=False),
+)
+
+
+def source_versions(raw_dir: Path, source_ids: set[str]) -> dict[str, dict]:
+    """Download date and checksum of each Source file used, from data/raw/<id>/meta.json."""
+    versions = {}
+    for source_id in sorted(source_ids):
+        try:
+            meta = json.loads((raw_dir / source_id / "meta.json").read_text())
+            versions[source_id] = {"fetched_at": meta["fetched_at"], "sha256": meta["sha256"]}
+        except (OSError, ValueError, KeyError):
+            versions[source_id] = {}
+    return versions
+
+
+class AuditStore:
+    def __init__(self, engine: Engine, raw_dir: Path):
+        self.engine = engine
+        self.raw_dir = raw_dir
+        metadata.create_all(engine, checkfirst=True)
+
+    def save(self, response: AskResponse, profile: dict | None) -> AskResponse:
+        response = response.model_copy(
+            update={"id": str(uuid.uuid4()), "created_at": datetime.now(UTC)}
+        )
+        versions = source_versions(self.raw_dir, {p.source_id for p in response.passages})
+        with self.engine.begin() as connection:
+            connection.execute(
+                answers.insert().values(
+                    id=response.id,
+                    created_at=response.created_at,
+                    question=response.question,
+                    profile=profile,
+                    model=response.model,
+                    response=json.loads(response.model_dump_json()),
+                    source_versions=versions,
+                )
+            )
+        return response
+
+    def recent(self, limit: int = 50) -> list[dict]:
+        query = (
+            select(answers.c.id, answers.c.created_at, answers.c.question, answers.c.model)
+            .order_by(answers.c.created_at.desc())
+            .limit(limit)
+        )
+        with self.engine.connect() as connection:
+            return [dict(row._mapping) for row in connection.execute(query)]
+
+    def get(self, answer_id: str) -> dict | None:
+        with self.engine.connect() as connection:
+            row = connection.execute(select(answers).where(answers.c.id == answer_id)).first()
+            return dict(row._mapping) if row else None
+
+
+def to_markdown(record: dict) -> str:
+    """A readable export of one stored answer, with its Passages and Source versions."""
+    r = record["response"]
+    lines = [
+        "# Compliance Advisor: answer record",
+        "",
+        f"- Asked: {record['created_at'].isoformat(timespec='seconds')}",
+        f"- Model: {r['model']}",
+        f"- Tokens: {r['usage']['input_tokens']} in, {r['usage']['output_tokens']} out"
+        + (f"; cost {r['usage']['cost_usd']:.4f} $" if r["usage"].get("cost_usd") else ""),
+    ]
+    if record.get("profile"):
+        p = record["profile"]
+        lines.append(
+            f"- Firm Profile: {p['firm_type']}, {p['size']}, activities: {', '.join(p['activities']) or 'none'}"
+        )
+    if r.get("redactions"):
+        lines.append(f"- Removed by the pre-check: {', '.join(r['redactions'])}")
+    lines += ["", "## Question", "", r["question"], "", "## Answer", "", r["answer"], ""]
+    if r.get("tools"):
+        lines += ["## Rule checks", ""]
+        for t in r["tools"]:
+            lines += [
+                f"### {t['name']}",
+                "",
+                "```json",
+                json.dumps(t["result"], indent=2, ensure_ascii=False),
+                "```",
+                "",
+            ]
+    lines += ["## Passages", ""]
+    for p in r["passages"]:
+        cited = "cited" if p["n"] in r["cited"] else "not cited"
+        lines += [
+            (
+                f"**[{p['n']}] {p.get('provision') or p['short_title']}** "
+                f"({p['issuer']}, {p['layer']}, {p.get('legal_status', '')}, {cited}) "
+                f"{p.get('link') or p['url']}"
+            ),
+            "",
+            "> " + p["text"].replace("\n", "\n> "),
+            "",
+        ]
+    lines += ["## Source versions", ""]
+    for source_id, v in record["source_versions"].items():
+        lines.append(
+            f"- {source_id}: downloaded {v.get('fetched_at', '?')}, sha256 {v.get('sha256', '?')}"
+        )
+    lines += ["", f"_{r['disclaimer']}_", ""]
+    return "\n".join(lines)

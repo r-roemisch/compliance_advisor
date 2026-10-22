@@ -1,0 +1,267 @@
+import type { Lang } from "./types";
+
+const de = {
+  appName: "Compliance Advisor",
+  tagline: "Regulatorische Recherche für Banken und Versicherer unter deutscher Aufsicht",
+  questionLabel: "Ihre Frage",
+  questionPlaceholder: "Zum Beispiel: Ab wann ist ein IKT-Vorfall nach DORA schwerwiegend?",
+  ask: "Frage stellen",
+  newQuestion: "Neue Frage",
+  charCount: (n: number) => `${n} von 2000 Zeichen`,
+  tooShort: "Bitte mindestens 3 Zeichen eingeben.",
+  examplesTitle: "Beispiele",
+  emptyTitle: "Fragen Sie nach Pflichten, Fristen und Zuständigkeiten.",
+  emptyBody:
+    "Antworten stützen sich auf EU-Recht, deutsche Gesetze und BaFin-Verwaltungspraxis. Jede Aussage verweist auf die Fundstelle; Regelprüfungen berechnen Schwellenwerte und Fristen.",
+  profile: "Firmenprofil",
+  noProfile: "Kein Firmenprofil",
+  editProfile: "Profil bearbeiten",
+  profileTitle: "Firmenprofil",
+  profileIntro:
+    "Das Profil bestimmt, welche Regelwerke gelten. Es wird mit jeder Frage gesendet und nur in diesem Browser gespeichert.",
+  presets: "Vorlagen nach Unternehmensart",
+  firmType: "Unternehmensart",
+  size: "Größe",
+  customers: "Kunden",
+  activities: "Tätigkeiten",
+  applyProfile: "Profil übernehmen",
+  clearProfile: "Profil entfernen",
+  cancel: "Abbrechen",
+  model: "Modell",
+  euHosted: "EU-gehostet",
+  language: "Sprache",
+  theme: "Darstellung",
+  themeLight: "Hell",
+  themeDark: "Dunkel",
+  themeSystem: "System",
+  history: "Verlauf",
+  historyEmpty: "Noch keine gespeicherten Antworten.",
+  sources: "Quellen",
+  passages: "Fundstellen",
+  passagesCount: (n: number) => `${n} Passagen`,
+  answer: "Antwort",
+  ruleChecks: "Regelprüfungen",
+  stageSearch: "Quellen durchsuchen",
+  stageModel: "Frage analysieren",
+  stageTools: "Regelprüfungen ausführen",
+  stageWriting: "Antwort formulieren",
+  elapsed: (s: number) => `${s} s`,
+  coverageNone: "Die indexierten Quellen beantworten diese Frage nicht.",
+  coveragePartial: "Die indexierten Quellen beantworten diese Frage nur teilweise.",
+  redacted: (kinds: string) => `Vor dem Senden entfernt: ${kinds}.`,
+  redactionKinds: { IBAN: "IBAN", "email address": "E-Mail-Adresse", "phone number": "Telefonnummer" } as Record<string, string>,
+  cited: "zitiert",
+  notCited: "nicht zitiert",
+  openProvision: "Fundstelle öffnen",
+  openSource: "Quelle öffnen",
+  asOf: (d: string) => `Stand ${d}`,
+  similarity: (s: string) => `Ähnlichkeit ${s}`,
+  cost: (usd: string) => `${usd} $`,
+  tokens: (i: number, o: number) => `${i.toLocaleString("de-DE")} Token ein, ${o.toLocaleString("de-DE")} aus`,
+  export: "Export",
+  exportMd: "Markdown",
+  exportJson: "JSON",
+  print: "Drucken / PDF",
+  layersUsed: "Herangezogene Ebenen",
+  errorUnreachable: "Das Backend ist nicht erreichbar. Läuft der Server?",
+  errorPrefix: "Die Antwort konnte nicht erstellt werden:",
+  retry: "Erneut versuchen",
+  missingFacts: "Fehlende Angaben",
+  deadlines: "Fristen",
+  duties: "Pflichten",
+  appliesFrom: "Anwendbar ab",
+  majorIncident: "Schwerwiegender IKT-Vorfall",
+  riskClass: "Risikoklasse",
+  notice:
+    "Dies sind regulatorische Informationen aus den indexierten Quellen, keine Rechtsberatung. Prüfen Sie den amtlichen Text, bevor Sie sich darauf stützen.",
+  noticeShort: "Keine Rechtsberatung",
+  skip: "Zum Inhalt springen",
+};
+
+const en: typeof de = {
+  appName: "Compliance Advisor",
+  tagline: "Regulatory research for banks and insurers supervised in Germany",
+  questionLabel: "Your question",
+  questionPlaceholder: "For example: When is an ICT-related incident major under DORA?",
+  ask: "Ask",
+  newQuestion: "New question",
+  charCount: (n: number) => `${n} of 2000 characters`,
+  tooShort: "Enter at least 3 characters.",
+  examplesTitle: "Examples",
+  emptyTitle: "Ask about obligations, deadlines and who is in scope.",
+  emptyBody:
+    "Answers draw on EU law, German acts and BaFin practice. Every statement cites its provision; rule checks compute thresholds and deadlines.",
+  profile: "Firm Profile",
+  noProfile: "No Firm Profile",
+  editProfile: "Edit profile",
+  profileTitle: "Firm Profile",
+  profileIntro:
+    "The profile decides which rules apply. It is sent with every question and stored only in this browser.",
+  presets: "Presets by firm type",
+  firmType: "Firm type",
+  size: "Size",
+  customers: "Customers",
+  activities: "Activities",
+  applyProfile: "Use this profile",
+  clearProfile: "Remove profile",
+  cancel: "Cancel",
+  model: "Model",
+  euHosted: "EU-hosted",
+  language: "Language",
+  theme: "Theme",
+  themeLight: "Light",
+  themeDark: "Dark",
+  themeSystem: "System",
+  history: "History",
+  historyEmpty: "No stored answers yet.",
+  sources: "Sources",
+  passages: "Passages",
+  passagesCount: (n: number) => `${n} passages`,
+  answer: "Answer",
+  ruleChecks: "Rule checks",
+  stageSearch: "Searching the Sources",
+  stageModel: "Analysing the question",
+  stageTools: "Running rule checks",
+  stageWriting: "Writing the answer",
+  elapsed: (s: number) => `${s} s`,
+  coverageNone: "The indexed Sources do not answer this question.",
+  coveragePartial: "The indexed Sources answer this question only in part.",
+  redacted: (kinds: string) => `Removed before sending: ${kinds}.`,
+  redactionKinds: { IBAN: "IBAN", "email address": "email address", "phone number": "phone number" },
+  cited: "cited",
+  notCited: "not cited",
+  openProvision: "Open provision",
+  openSource: "Open source",
+  asOf: (d: string) => `as of ${d}`,
+  similarity: (s: string) => `similarity ${s}`,
+  cost: (usd: string) => `$${usd}`,
+  tokens: (i: number, o: number) => `${i.toLocaleString("en-GB")} tokens in, ${o.toLocaleString("en-GB")} out`,
+  export: "Export",
+  exportMd: "Markdown",
+  exportJson: "JSON",
+  print: "Print / PDF",
+  layersUsed: "Layers drawn on",
+  errorUnreachable: "The backend is not reachable. Is the server running?",
+  errorPrefix: "The answer could not be produced:",
+  retry: "Try again",
+  missingFacts: "Missing facts",
+  deadlines: "Deadlines",
+  duties: "Duties",
+  appliesFrom: "Applies from",
+  majorIncident: "Major ICT-related incident",
+  riskClass: "Risk class",
+  notice:
+    "This is regulatory information generated from the indexed Sources, not legal advice. Verify against the official text before relying on it.",
+  noticeShort: "Not legal advice",
+  skip: "Skip to content",
+};
+
+export const STRINGS = { de, en };
+export type Strings = typeof de;
+
+/** Regulatory Layers, in stack order, with their binding force. */
+export const LAYERS = [
+  { id: "eu_level_1", binding: true, de: "EU-Ebene 1: Verordnung, Richtlinie", en: "EU Level 1: regulation, directive" },
+  { id: "eu_level_2", binding: true, de: "EU-Ebene 2: technischer Standard", en: "EU Level 2: technical standard" },
+  { id: "eu_level_3", binding: false, de: "EU-Ebene 3: Leitlinie", en: "EU Level 3: guideline" },
+  { id: "national_law", binding: true, de: "Deutsches Gesetz", en: "German law" },
+  { id: "supervisory_practice", binding: false, de: "BaFin-Verwaltungspraxis", en: "BaFin practice" },
+] as const;
+
+export const LEGAL_STATUS: Record<string, Record<Lang, string>> = {
+  in_force: { de: "in Kraft", en: "in force" },
+  applies_later: { de: "gilt später", en: "applies later" },
+  pending_proposal: { de: "Entwurf", en: "proposal" },
+};
+
+export const REGIMES: Record<string, Record<Lang, string>> = {
+  dora: { de: "DORA", en: "DORA" },
+  aml: { de: "Geldwäsche", en: "Anti-money laundering" },
+  payments: { de: "Zahlungsverkehr", en: "Payments" },
+  insurance: { de: "Versicherungsaufsicht", en: "Insurance supervision" },
+  banking: { de: "Bankenaufsicht", en: "Banking supervision" },
+  digital: { de: "Digitales", en: "Digital" },
+};
+
+export const FIRM_TYPES: Record<string, Record<Lang, string>> = {
+  significant_bank: { de: "Bedeutendes Institut (EZB)", en: "Significant bank (ECB)" },
+  less_significant_bank: { de: "Weniger bedeutendes Institut (BaFin)", en: "Less significant bank (BaFin)" },
+  primary_insurer: { de: "Erstversicherer", en: "Primary insurer" },
+  reinsurer: { de: "Rückversicherer", en: "Reinsurer" },
+  insurance_group: { de: "Versicherungsgruppe", en: "Insurance group" },
+  payment_institution: { de: "Zahlungsinstitut", en: "Payment institution" },
+  e_money_institution: { de: "E-Geld-Institut", en: "E-money institution" },
+  crypto_asset_service_provider: { de: "Kryptowerte-Dienstleister", en: "Crypto-asset service provider" },
+};
+
+export const SIZES: Record<string, Record<Lang, string>> = {
+  large: { de: "groß", en: "large" },
+  medium: { de: "mittel", en: "medium" },
+  small: { de: "klein", en: "small" },
+};
+
+export const CUSTOMERS: Record<string, Record<Lang, string>> = {
+  retail: { de: "Privatkunden", en: "Retail" },
+  corporate: { de: "Firmenkunden", en: "Corporate" },
+  both: { de: "beide", en: "Both" },
+};
+
+export const ACTIVITIES: Record<string, Record<Lang, string>> = {
+  life_insurance: { de: "Lebensversicherung", en: "Life insurance" },
+  health_insurance: { de: "Krankenversicherung", en: "Health insurance" },
+  non_life_insurance: { de: "Schaden-/Unfallversicherung", en: "Non-life insurance" },
+  reinsurance_business: { de: "Rückversicherungsgeschäft", en: "Reinsurance business" },
+  payment_services: { de: "Zahlungsdienste", en: "Payment services" },
+  cloud_outsourcing: { de: "Cloud-Auslagerung", en: "Cloud outsourcing" },
+  ai_credit_scoring: { de: "KI: Kreditwürdigkeitsprüfung", en: "AI: credit scoring" },
+  ai_insurance_pricing: { de: "KI: Tarifierung", en: "AI: insurance pricing" },
+  ai_claims_handling: { de: "KI: Schadenbearbeitung", en: "AI: claims handling" },
+  ai_customer_chatbot: { de: "KI: Kunden-Chatbot", en: "AI: customer chatbot" },
+};
+
+export const TOOL_NAMES: Record<string, Record<Lang, string>> = {
+  check_applicability: { de: "Anwendbarkeit", en: "Applicability" },
+  compliance_timeline: { de: "Zeitplan", en: "Timeline" },
+  classify_dora_incident: { de: "DORA-Vorfallklassifizierung", en: "DORA incident classification" },
+  check_ai_act_use_case: { de: "KI-VO-Einstufung", en: "AI Act classification" },
+};
+
+export const APPLIES: Record<string, Record<Lang, string>> = {
+  yes: { de: "gilt", en: "applies" },
+  no: { de: "gilt nicht", en: "does not apply" },
+  check: { de: "prüfen", en: "check" },
+  later: { de: "gilt später", en: "applies later" },
+  not_in_corpus: { de: "nicht im Korpus", en: "not in Corpus" },
+};
+
+export const VERDICTS: Record<string, Record<Lang, string>> = {
+  yes: { de: "ja", en: "yes" },
+  no: { de: "nein", en: "no" },
+  undetermined: { de: "offen", en: "undetermined" },
+  high_risk: { de: "Hochrisiko", en: "High-risk" },
+  possibly_not_high_risk: { de: "möglicherweise nicht Hochrisiko", en: "Possibly not high-risk" },
+  transparency: { de: "Transparenzpflichten", en: "Transparency duties" },
+  minimal: { de: "kein Hochrisiko", en: "Not high-risk" },
+};
+
+export const CRITERIA: Record<string, Record<Lang, string>> = {
+  "clients, financial counterparts and transactions": { de: "Kunden, Gegenparteien und Transaktionen", en: "clients, financial counterparts and transactions" },
+  "reputational impact": { de: "Auswirkungen auf die Reputation", en: "reputational impact" },
+  "duration and service downtime": { de: "Dauer und Ausfallzeit", en: "duration and service downtime" },
+  "geographical spread": { de: "Geografische Ausbreitung", en: "geographical spread" },
+  "data losses": { de: "Datenverluste", en: "data losses" },
+  "economic impact": { de: "Wirtschaftliche Auswirkungen", en: "economic impact" },
+};
+
+export const EXAMPLES: Record<Lang, string[]> = {
+  de: [
+    "Welche Aufgaben hat die Compliance-Funktion eines Versicherungsunternehmens?",
+    "Ab wann gelten die Hochrisiko-Pflichten der KI-Verordnung für Kreditwürdigkeitsprüfungen?",
+    "Welche allgemeinen Sorgfaltspflichten gelten bei einer Kontoeröffnung nach dem GwG?",
+  ],
+  en: [
+    "Our online banking was down for 3 hours and 150,000 clients were affected; critical services were hit. Is it a major incident under DORA?",
+    "Which regimes apply to us?",
+    "What does § 25a KWG require from a bank's business organisation?",
+  ],
+};

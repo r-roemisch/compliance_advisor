@@ -1,0 +1,26 @@
+# Answer Models offered in the interface. The first entry is the default.
+#
+# Not legal advice: the Compliance Advisor gives general regulatory information only.
+#
+#   id              OpenRouter model id (must support tool calling)
+#   label           shown in the model picker
+#   note            short explanation per interface language
+#   eu_hosted       true when requests are pinned to a provider based in the EU
+#   provider_only   OpenRouter provider slugs the request may go to (pins the hosting)
+#
+# Prices change; the interface shows the actual cost OpenRouter reports for each answer.
+
+models:
+  - id: openai/gpt-6-luna
+    label: GPT-6 Luna
+    note: {de: "Standard, sehr günstig", en: "Default, very low cost"}
+
+  - id: mistralai/mistral-large-4-0
+    label: Mistral Large 4
+    note: {de: "Anbieter mit Sitz in der EU (Mistral AI, Paris)", en: "EU-based provider (Mistral AI, Paris)"}
+    eu_hosted: true
+    provider_only: [mistral]
+
+  - id: anthropic/claude-sonnet-5.5
+    label: Claude Sonnet 5.5
+    note: {de: "Höchste Qualität, teurer", en: "Highest quality, higher cost"}

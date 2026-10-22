@@ -1,0 +1,51 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+import { TOOL_NAMES, type Strings } from "@/lib/i18n";
+import type { Lang, Stage } from "@/lib/types";
+
+/** The real steps the backend reports while it works; tools appear only when called. */
+export function Progress({ t, lang, stage, tools }: { t: Strings; lang: Lang; stage: Stage; tools: string[] }) {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const started = Date.now();
+    const timer = setInterval(() => setSeconds(Math.round((Date.now() - started) / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const steps: { id: Stage; label: string }[] = [
+    { id: "search", label: t.stageSearch },
+    { id: "model", label: t.stageModel },
+    ...(tools.length || stage === "tools" || stage === "writing" ? [{ id: "tools" as Stage, label: t.stageTools }] : []),
+    { id: "writing", label: t.stageWriting },
+  ];
+  const order: Stage[] = ["search", "model", "tools", "writing"];
+  const position = order.indexOf(stage);
+
+  return (
+    <div role="status" aria-live="polite" className="rounded border border-line bg-panel px-4 py-3">
+      <ol className="flex flex-col gap-1.5 text-sm">
+        {steps.map((step) => {
+          const index = order.indexOf(step.id);
+          const state = index < position ? "done" : index === position ? "active" : "todo";
+          return (
+            <li key={step.id} className={`flex items-center gap-2.5 ${state === "todo" ? "text-ink-3" : ""}`}>
+              <span
+                aria-hidden
+                className={`inline-block h-2.5 w-2.5 rounded-full border ${
+                  state === "done" ? "border-ink bg-ink" : state === "active" ? "animate-pulse border-accent bg-accent" : "border-line"
+                }`}
+              />
+              <span className={state === "active" ? "font-medium" : ""}>{step.label}</span>
+              {step.id === "tools" && tools.length > 0 && (
+                <span className="text-ink-2">({tools.map((n) => TOOL_NAMES[n]?.[lang] ?? n).join(", ")})</span>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+      <p className="mt-2 text-xs text-ink-3 tabular-nums">{t.elapsed(seconds)}</p>
+    </div>
+  );
+}

@@ -1,19 +1,23 @@
-"""The HTTP API: ask a question, check health, list the Corpus."""
+"""The HTTP API: ask a question, history and export, models, presets, health, the Corpus."""
 
 import json
 import logging
+import queue
+import threading
 from functools import lru_cache
 from typing import Annotated
 
 import uvicorn
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
-from .answer import AnswerService, DatabaseError, UpstreamError, get_answer_model
+from .answer import AnswerService, DatabaseError, UpstreamError
+from .audit import AuditStore, to_markdown
 from .embeddings import get_embeddings
+from .models import chat_models, load_models
 from .profile import PRESETS, FirmProfile
 from .prompt import DISCLAIMER
 from .registry import load_sources
@@ -65,11 +69,23 @@ def _service() -> AnswerService:
             settings.candidates,
             [s.short_title for s in load_sources(settings.sources_file)],
         ),
-        get_answer_model(settings),
-        settings.answer_model,
+        chat_models(settings),
+        load_models(settings.models_file)[0].id,
         settings.top_k,
         tool_factory,
     )
+
+
+@lru_cache
+def _audit() -> AuditStore:
+    return AuditStore(_engine(), get_settings().raw_dir)
+
+
+def get_audit() -> AuditStore | None:
+    try:
+        return _audit()
+    except SQLAlchemyError:
+        return None  # answers still work; they are just not stored
 
 
 def get_service() -> AnswerService:
@@ -115,6 +131,11 @@ async def invalid_input(request: Request, exc: RequestValidationError) -> JSONRe
     return JSONResponse(status_code=422, content={"detail": "; ".join(messages)})
 
 
+@app.exception_handler(ValueError)
+async def bad_value(request: Request, exc: ValueError) -> JSONResponse:
+    return JSONResponse(status_code=422, content={"detail": str(exc)})
+
+
 @app.exception_handler(UpstreamError)
 async def upstream_failed(request: Request, exc: UpstreamError) -> JSONResponse:
     return JSONResponse(status_code=502, content={"detail": str(exc).capitalize()})
@@ -125,11 +146,122 @@ async def database_down(request: Request, exc: DatabaseError) -> JSONResponse:
     return JSONResponse(status_code=503, content={"detail": str(exc).capitalize()})
 
 
+log = logging.getLogger("compliance_advisor.api")
+
+
+def _store(audit: AuditStore | None, response: AskResponse, request: AskRequest) -> AskResponse:
+    if audit is None:
+        return response
+    try:
+        return audit.save(response, request.profile.model_dump() if request.profile else None)
+    except SQLAlchemyError as e:
+        log.warning("answer not stored in the audit trail: %s", e)
+        return response
+
+
 @app.post("/api/ask", response_model=AskResponse)
 def ask(
-    request: AskRequest, service: Annotated[AnswerService, Depends(get_service)]
+    request: AskRequest,
+    service: Annotated[AnswerService, Depends(get_service)],
+    audit: Annotated[AuditStore | None, Depends(get_audit)],
 ) -> AskResponse:
-    return service.ask(request.question, request.top_k, request.profile)
+    response = service.ask(request.question, request.top_k, request.profile, request.model)
+    return _store(audit, response, request)
+
+
+def _event(data: dict) -> str:
+    return f"data: {json.dumps(data, default=str)}\n\n"
+
+
+@app.post("/api/ask/stream")
+def ask_stream(
+    request: AskRequest,
+    service: Annotated[AnswerService, Depends(get_service)],
+    audit: Annotated[AuditStore | None, Depends(get_audit)],
+) -> StreamingResponse:
+    """Server-sent events: one per step (search, model, tools, writing), then the result."""
+    events: queue.Queue = queue.Queue()
+
+    def work() -> None:
+        try:
+            response = service.ask(
+                request.question,
+                request.top_k,
+                request.profile,
+                request.model,
+                on_stage=lambda stage, data: events.put({"stage": stage, **data}),
+            )
+            response = _store(audit, response, request)
+            events.put({"stage": "done", "result": json.loads(response.model_dump_json())})
+        except UpstreamError as e:
+            events.put({"stage": "error", "status": 502, "detail": str(e).capitalize()})
+        except DatabaseError as e:
+            events.put({"stage": "error", "status": 503, "detail": str(e).capitalize()})
+        except ValueError as e:
+            events.put({"stage": "error", "status": 422, "detail": str(e)})
+        except Exception as e:
+            log.exception("ask failed")
+            events.put({"stage": "error", "status": 500, "detail": f"Unexpected error: {e}"})
+        finally:
+            events.put(None)
+
+    threading.Thread(target=work, daemon=True).start()
+
+    def stream():
+        while (item := events.get()) is not None:
+            yield _event(item)
+
+    return StreamingResponse(
+        stream(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"}
+    )
+
+
+@app.get("/api/models")
+def models() -> dict:
+    """The Answer Models the interface offers; the first is the default."""
+    return {
+        "models": [
+            m.model_dump(exclude={"provider_only"}) for m in load_models(get_settings().models_file)
+        ]
+    }
+
+
+@app.get("/api/history")
+def history(audit: Annotated[AuditStore | None, Depends(get_audit)], limit: int = 50) -> dict:
+    if audit is None:
+        raise DatabaseError("the database is not reachable")
+    return {"items": audit.recent(min(max(limit, 1), 200))}
+
+
+@app.get("/api/history/{answer_id}")
+def history_item(answer_id: str, audit: Annotated[AuditStore | None, Depends(get_audit)]) -> dict:
+    if audit is None:
+        raise DatabaseError("the database is not reachable")
+    record = audit.get(answer_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="No stored answer with this id")
+    return record
+
+
+@app.get("/api/history/{answer_id}/export")
+def export(
+    answer_id: str, audit: Annotated[AuditStore | None, Depends(get_audit)], format: str = "md"
+) -> Response:
+    """The stored answer as Markdown or JSON, with Passages and Source versions."""
+    record = history_item(answer_id, audit)
+    name = f"compliance-advisor-{record['created_at']:%Y%m%d-%H%M%S}"
+    if format == "json":
+        body = json.dumps(record, default=str, ensure_ascii=False, indent=2)
+        media, ext = "application/json", "json"
+    elif format == "md":
+        body, media, ext = to_markdown(record), "text/markdown; charset=utf-8", "md"
+    else:
+        raise HTTPException(status_code=422, detail="format must be md or json")
+    return Response(
+        body,
+        media_type=media,
+        headers={"Content-Disposition": f'attachment; filename="{name}.{ext}"'},
+    )
 
 
 @app.get("/api/profiles")

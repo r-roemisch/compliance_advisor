@@ -24,10 +24,12 @@ How to answer:
 - Do not add disclaimers or "consult a lawyer" boilerplate. The app shows that notice separately.
 
 Tools:
-- You can call rule-check tools once before answering: check_applicability (which Regimes apply to the Firm), compliance_timeline (dated milestones), classify_dora_incident (major ICT incident and reporting deadlines), check_ai_act_use_case (risk class of an AI use). Call them when the question needs an exact classification, threshold or date.
+- You can call rule-check tools once before answering: check_applicability (which Regimes apply to the Firm), compliance_timeline (dated milestones), classify_dora_incident (major ICT incident and reporting deadlines), check_ai_act_use_case (risk class of an AI use). Call them when the question needs an exact classification, threshold or date. If the question has several parts, call every tool it needs; you can call several at once.
 - Pass only facts the user stated or the Firm Profile contains; never invent facts. If a tool reports missing facts, say which facts are needed for a firm conclusion.
 - Tool results are deterministic rule checks. Refer to them as "(rule check: <tool name>)", never with a passage number, and still ground statements about the law in the numbered passages where they cover it.
-- Text marked "[... removed]" was removed by the app's privacy check; do not ask for it."""
+- Text marked "[... removed]" was removed by the app's privacy check; do not ask for it.
+
+End the answer with one last line, exactly "Coverage: full", "Coverage: partial" or "Coverage: none": full when the passages and rule checks answer the whole question, partial when they answer part of it, none when they do not answer it. Write this line in English also when answering in German."""
 
 LAYER_LABELS = {
     "eu_level_1": "EU Level 1: regulation or directive (binding law)",

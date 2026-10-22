@@ -1,4 +1,6 @@
-// Mirrors backend/src/compliance_advisor/schemas.py.
+// Mirrors backend/src/compliance_advisor/schemas.py and the Rule Check results in tools.py.
+
+export type Lang = "de" | "en";
 
 export type Passage = {
   n: number;
@@ -21,33 +23,30 @@ export type Passage = {
   text: string;
 };
 
-export type ToolRun = {
-  name: string;
-  arguments: Record<string, unknown>;
-  result: Record<string, unknown>;
-};
+export type ToolRun = { name: string; arguments: Record<string, unknown>; result: Record<string, unknown> };
 
-export type FirmProfile = {
-  firm_type: string;
-  size: string;
-  customers: string;
-  activities: string[];
-};
-
-export type Preset = { id: string; label: { de: string; en: string }; profile: FirmProfile };
+export type Usage = { input_tokens: number; output_tokens: number; cost_usd: number };
 
 export type AskResponse = {
+  id: string | null;
+  created_at: string | null;
   question: string;
   redactions: string[];
   answer: string;
   passages: Passage[];
   cited: number[];
   tools: ToolRun[];
+  coverage: "full" | "partial" | "none" | "unknown";
   model: string;
-  usage: { input_tokens: number; output_tokens: number };
+  usage: Usage;
   disclaimer: string;
 };
 
+export type FirmProfile = { firm_type: string; size: string; customers: string; activities: string[] };
+export type Preset = { id: string; label: Record<Lang, string>; profile: FirmProfile };
+export type ModelOption = { id: string; label: string; note: Record<string, string>; eu_hosted: boolean };
+
+export type Milestone = { date: string; what: string };
 export type SourceInfo = {
   id: string;
   title: string;
@@ -57,7 +56,19 @@ export type SourceInfo = {
   issuer: string;
   language: string;
   url: string;
+  legal_status: string;
+  version: string;
+  milestones: Milestone[];
+  as_of: string;
   passages: number;
 };
 
-export type SourcesResponse = { sources: SourceInfo[]; disclaimer: string };
+export type HistoryItem = { id: string; created_at: string; question: string; model: string };
+
+export type Stage = "search" | "model" | "tools" | "writing";
+export type StreamEvent =
+  | { stage: Stage; tools?: string[]; redactions?: string[] }
+  | { stage: "done"; result: AskResponse }
+  | { stage: "error"; status: number; detail: string };
+
+export type Ref = { provision: string; link: string };

@@ -11,7 +11,6 @@ import openai
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import StructuredTool
-from langchain_openai import ChatOpenAI
 from pydantic import ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -20,7 +19,6 @@ from .profile import FirmProfile
 from .prompt import DISCLAIMER, build_messages
 from .retriever import Retriever
 from .schemas import AskResponse, PassageOut, ToolRun, Usage
-from .settings import OPENROUTER_BASE_URL, Settings
 
 log = logging.getLogger("compliance_advisor.ask")
 
@@ -34,17 +32,6 @@ class UpstreamError(RuntimeError):
 
 class DatabaseError(RuntimeError):
     """Postgres is not reachable."""
-
-
-def get_answer_model(settings: Settings) -> ChatOpenAI:
-    return ChatOpenAI(
-        model=settings.answer_model,
-        api_key=settings.require_api_key(),
-        base_url=OPENROUTER_BASE_URL,
-        timeout=90,
-        max_retries=1,
-        default_headers={"X-Title": "Compliance Advisor"},
-    )
 
 
 def cited_numbers(answer: str, available: int) -> list[int]:
@@ -68,7 +55,28 @@ def _usage(*replies) -> Usage:
         meta = getattr(reply, "usage_metadata", None) or {}
         total.input_tokens += meta.get("input_tokens", 0)
         total.output_tokens += meta.get("output_tokens", 0)
+        reported = (getattr(reply, "response_metadata", None) or {}).get("token_usage") or {}
+        total.cost_usd += float(reported.get("cost") or 0.0)
+    total.cost_usd = round(total.cost_usd, 6)
     return total
+
+
+_COVERAGE = re.compile(r"\s*[*_]*\s*Coverage:\s*(full|partial|none)\W*\s*$", re.IGNORECASE)
+
+
+def split_coverage(answer: str) -> tuple[str, str]:
+    """Removes the model's closing "Coverage: …" line and returns it separately."""
+    match = _COVERAGE.search(answer)
+    if not match:
+        return answer.strip(), "unknown"
+    return answer[: match.start()].rstrip(), match.group(1).lower()
+
+
+Stage = Callable[[str, dict], None]
+
+
+def _quiet(stage: str, data: dict) -> None:
+    pass
 
 
 def _text(reply) -> str:
@@ -82,27 +90,30 @@ class AnswerService:
     def __init__(
         self,
         retriever: Retriever,
-        model: BaseChatModel,
+        models: BaseChatModel | dict[str, BaseChatModel],
         model_id: str,
         top_k: int,
         tools: ToolFactory | None = None,
     ):
+        """`models` maps model ids to chat models; `model_id` is the default."""
         self.retriever = retriever
-        self.model = model
+        self.models = models if isinstance(models, dict) else {model_id: models}
         self.model_id = model_id
         self.top_k = top_k
         self.tools = tools
 
-    def _tool_round(self, messages, profile: FirmProfile | None):
+    def _tool_round(self, model, messages, profile: FirmProfile | None, on_stage: Stage):
         """One round: the model may call tools once, then answers without further tool calls.
         Returns the final reply, all replies (for token usage) and the tool runs."""
         tools = self.tools(profile, date.today()) if self.tools else []
+        on_stage("model", {})
         if not tools:
-            reply = self.model.invoke(messages)
+            reply = model.invoke(messages)
             return reply, [reply], []
-        first = self.model.bind_tools(tools).invoke(messages)
+        first = model.bind_tools(tools).invoke(messages)
         if not getattr(first, "tool_calls", None):
             return first, [first], []
+        on_stage("tools", {"tools": [call["name"] for call in first.tool_calls[:MAX_TOOL_CALLS]]})
         by_name = {tool.name: tool for tool in tools}
         runs: list[ToolRun] = []
         follow_up = list(messages) + [first]
@@ -122,14 +133,24 @@ class AnswerService:
             follow_up.append(
                 ToolMessage(content='{"error": "too many tool calls"}', tool_call_id=call["id"])
             )
-        final = self.model.bind_tools(tools, tool_choice="none").invoke(follow_up)
+        on_stage("writing", {})
+        final = model.bind_tools(tools, tool_choice="none").invoke(follow_up)
         return final, [first, final], runs
 
     def ask(
-        self, question: str, top_k: int | None = None, profile: FirmProfile | None = None
+        self,
+        question: str,
+        top_k: int | None = None,
+        profile: FirmProfile | None = None,
+        model_id: str | None = None,
+        on_stage: Stage = _quiet,
     ) -> AskResponse:
         started = time.monotonic()
+        model_id = model_id or self.model_id
+        if model_id not in self.models:
+            raise ValueError(f"unknown model {model_id!r}; choose one of {', '.join(self.models)}")
         question, redactions = redact(question)
+        on_stage("search", {"redactions": redactions})
         try:
             passages = self.retriever.retrieve(question, top_k or self.top_k)
         except openai.APIError as e:
@@ -138,11 +159,13 @@ class AnswerService:
             raise DatabaseError("the database is not reachable") from e
         messages = build_messages(question, passages, profile.describe() if profile else "")
         try:
-            reply, replies, runs = self._tool_round(messages, profile)
+            reply, replies, runs = self._tool_round(
+                self.models[model_id], messages, profile, on_stage
+            )
         except openai.APIError as e:
             raise UpstreamError(f"the answer model did not respond: {e}") from e
 
-        answer = _text(reply)
+        answer, coverage = split_coverage(_text(reply))
         usage = _usage(*replies)
         response = AskResponse(
             question=question,
@@ -163,7 +186,8 @@ class AnswerService:
             ],
             cited=cited_numbers(answer, len(passages)),
             tools=runs,
-            model=self.model_id,
+            coverage=coverage,
+            model=model_id,
             usage=usage,
             disclaimer=DISCLAIMER,
         )
@@ -171,7 +195,7 @@ class AnswerService:
             "ask duration=%.1fs model=%s input_tokens=%d output_tokens=%d tools=%s redactions=%s "
             "passages=%s cited=%s",
             time.monotonic() - started,
-            self.model_id,
+            model_id,
             usage.input_tokens,
             usage.output_tokens,
             [r.name for r in runs],

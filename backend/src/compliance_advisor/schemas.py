@@ -1,5 +1,7 @@
 """Request and response shapes of the API."""
 
+from datetime import datetime
+
 from pydantic import BaseModel, Field, field_validator
 
 from .profile import FirmProfile
@@ -7,6 +9,7 @@ from .profile import FirmProfile
 
 class AskRequest(BaseModel):
     question: str = Field(min_length=3, max_length=2000)
+    model: str | None = None  # an id from config/models.yaml; default: the first
     top_k: int | None = Field(default=None, ge=1, le=20)
     profile: FirmProfile | None = None
 
@@ -40,6 +43,7 @@ class PassageOut(BaseModel):
 class Usage(BaseModel):
     input_tokens: int = 0
     output_tokens: int = 0
+    cost_usd: float = 0.0  # as reported by OpenRouter
 
 
 class ToolRun(BaseModel):
@@ -49,12 +53,15 @@ class ToolRun(BaseModel):
 
 
 class AskResponse(BaseModel):
+    id: str | None = None  # set when stored in the audit trail
+    created_at: datetime | None = None
     question: str  # as sent to the model, after the pre-check
     redactions: list[str] = []  # kinds of personal data the pre-check removed
     answer: str
     passages: list[PassageOut]
     cited: list[int]
     tools: list[ToolRun] = []
+    coverage: str = "full"  # full | partial | none: how far the Passages answer the question
     model: str
     usage: Usage
     disclaimer: str

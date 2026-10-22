@@ -39,6 +39,12 @@ def chunk_fixed(loaded: LoadedSource, chunk_size: int, chunk_overlap: int) -> li
     ]
 
 
+def mostly_text(text: str, min_letters: float = 0.5) -> bool:
+    """False for number tables ("76 98 80 82 85 75 NP"), which only add noise to the search."""
+    visible = [c for c in text if not c.isspace()]
+    return not visible or sum(c.isalpha() for c in visible) / len(visible) >= min_letters
+
+
 def chunk_provisions(
     loaded: LoadedSource, source: Source, max_chars: int, overlap: int
 ) -> list[Document]:
@@ -60,6 +66,7 @@ def chunk_provisions(
                 chunk_size=max_chars - len(header) - 20, chunk_overlap=overlap
             )
             pieces = splitter.split_text(body)
+        pieces = [piece for piece in pieces if mostly_text(piece)]
         for i, piece in enumerate(pieces, start=1):
             part = f" (part {i} of {len(pieces)})" if len(pieces) > 1 else ""
             # The label leads every Passage, so a split part still says which Provision it is.

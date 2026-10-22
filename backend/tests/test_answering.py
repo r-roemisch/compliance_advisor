@@ -50,6 +50,7 @@ class FakeModel:
 def client_with(model) -> TestClient:
     service = AnswerService(FakeRetriever(), model, "openai/gpt-6-luna", top_k=6)
     api.app.dependency_overrides[api.get_service] = lambda: service
+    api.app.dependency_overrides[api.get_audit] = lambda: None
     return TestClient(api.app)
 
 
@@ -81,12 +82,15 @@ def test_ask_returns_the_agreed_shape():
     assert response.status_code == 200
     body = response.json()
     assert set(body) == {
+        "id",
+        "created_at",
         "question",
         "redactions",
         "answer",
         "passages",
         "cited",
         "tools",
+        "coverage",
         "model",
         "usage",
         "disclaimer",
@@ -96,7 +100,7 @@ def test_ask_returns_the_agreed_shape():
     assert body["passages"][0]["n"] == 1 and body["passages"][0]["score"] == 0.81
     assert body["passages"][0]["provision"] == "Art. 17 DORA"
     assert body["passages"][0]["link"].endswith("#art_17")
-    assert body["usage"] == {"input_tokens": 900, "output_tokens": 40}
+    assert body["usage"] == {"input_tokens": 900, "output_tokens": 40, "cost_usd": 0.0}
     assert "not legal advice" in body["disclaimer"]
 
 

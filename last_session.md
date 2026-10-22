@@ -51,15 +51,23 @@ A second grilling session decided the end product and a five-day submission plan
 - Live tests with GPT-6 Luna: all four tools called correctly; incident deadline computed (14:00 for awareness 08:00, classification 10:00); German AI question answered in German with "Hochrisiko" and the missing facts. About 0.2 cent per answer with tools (8,000-10,000 input tokens).
 - 30 tests pass.
 
+## Day 3 (2026-10-22): done
+
+- Designed interface built from `docs/DESIGN-BRIEF.md` (Next.js, components in `frontend/src/components/`): German default and English, light/dark/system theme, Firm Profile dialog with presets, model choice, real progress steps, Citation chips that highlight their Passage, Regulatory Layer glyph and strip, coverage note, pre-check notice, Rule Check cards per tool, history sidebar, Sources list, export (Markdown, JSON, print/PDF), cost per answer, permanent notice.
+- Backend: `config/models.yaml` (new config file: GPT-6 Luna, Mistral Large 4 pinned to EU servers, Claude Sonnet 5.5); cost from OpenRouter; coverage line; audit trail table `answers` with Source versions; `/api/ask/stream`, `/api/models`, `/api/history`, export.
+- `.env.example` restored (an earlier commit had recorded its deletion when it was renamed to `.env`).
+- Number tables no longer indexed; Delegated Regulation 2015/35 re-indexed (634 Passages; 5,596 in the per-provision collection).
+- Checked in a real browser at 1440 px, in dark mode and at 390 px (no horizontal scroll, no console errors). 37 tests pass.
+
 ## Waiting on you
 
-- "Go" for day 3, and the design: run the design tool with `docs/DESIGN-BRIEF.md`, or tell me to build the layout from the brief directly.
-- The open choice from earlier: should one Rule Check (most likely the incident classifier) also get its own form?
+- "Go" for day 4, and a look at the interface: http://localhost:3010 (containers are running).
+- Still open: should the incident classifier also get its own form?
 
 ## Next session
 
-1. Day 3: design and frontend (German/English, trust elements, rule-check cards, history and audit trail, export, cost per answer, model choice with an EU model).
-2. Day 4: Extract Obligations, timeline view, Golden Set and evaluation.
+1. Day 4: Extract Obligations (table with CSV export), timeline view of all Milestones, Golden Set of about 20 questions (written after the interface, reviewed by you), retrieval evaluation with the results log (baseline first).
+2. Day 5: buffer, README walkthrough, demo script, screenshots.
 
 ## Agreed prompt (goes into `backend/.../prompt.py` in 1b)
 

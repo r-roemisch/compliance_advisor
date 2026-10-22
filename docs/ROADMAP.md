@@ -96,12 +96,15 @@ Trust must-haves: links to the exact provision, legal status and "as of" dates, 
 - Added during the build: every rule was read from the Sources' own text first (DORA Art. 2, RTS 2024/1772 Art. 1-9, RTS 2025/301 Art. 5, § 2 GwG, AMLR Art. 2-3, § 1 ZAG, Solvency II Art. 4, MaRisk AT 2.1, AI Act Art. 4, 6, 26, 27, 50, Annex III). Tool results link to the indexed Provision. The bare page got a preset choice, rule-check cards and the pre-check notice, to try the day before the design.
 - Seen in live tests: the model passes only stated facts, so an incident question that does not say whether critical services were affected gets "undetermined" and a list of missing facts. Names are not removed by the pre-check (agreed scope: IBAN, email, phone).
 
-### Day 3: Design and frontend (todo)
+### Day 3: Design and frontend (done 2026-10-22: designed interface DE/EN, audit trail, 37 tests)
 
 - The design from `docs/DESIGN-BRIEF.md`; German and English interface.
 - Trust elements, tool results, history list, export (JSON, Markdown, PDF via print), cost per answer in money, model choice including an EU-hosted model.
 - Audit trail: every answer stored with its Passages and Source versions.
 - Delivers H5 in full; A history and export; B token usage and costs; B visualisation of tool results; B multi-model support.
+- Added during the build: the layout was built directly from the brief (no separate design tool); signature element is the Regulatory Layer glyph and strip. Real progress steps via server-sent events (`/api/ask/stream`). A closing "Coverage:" line from the model drives the coverage note. `config/models.yaml` lists the models; Mistral is pinned to its EU servers. Number tables are no longer indexed (Delegated Regulation 2015/35 dropped from 1,453 to 634 Passages). `.env.example` was restored; an earlier commit had recorded its deletion.
+- Not built: a separate form for the incident classifier (left open). Rule-check details (reasons, deadlines) are generated in English also in the German interface; the labels around them are translated.
+- Seen in tests: Mistral answers take about 60 seconds and cost about 2.5 cents; GPT-6 Luna about 15 seconds and 0.15 cent. For broad planning questions the model may call only the applicability check, not the timeline.
 
 ### Day 4: Obligations and evaluation (todo)
 

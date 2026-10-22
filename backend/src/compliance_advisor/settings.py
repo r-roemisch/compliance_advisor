@@ -17,7 +17,6 @@ class Settings(BaseSettings):
     openrouter_api_key: str = ""
     database_url: str = "postgresql+psycopg://advisor:advisor@localhost:5433/advisor"
     embedding_model: str = "openai/text-embedding-3-small"
-    answer_model: str = "openai/gpt-6-luna"
     top_k: int = 6
     max_per_source: int = 3  # at most this many Passages from one Source; 0 = no cap
     candidates: int = 24  # Passages fetched before the cap is applied
@@ -36,6 +35,10 @@ class Settings(BaseSettings):
     def collection(self) -> str:
         """One collection per embedding model and chunker, so indexes never mix."""
         return f"{self.embedding_model}:{self.chunker}"
+
+    @property
+    def models_file(self) -> Path:
+        return self.config_dir / "models.yaml"
 
     @property
     def sources_file(self) -> Path:

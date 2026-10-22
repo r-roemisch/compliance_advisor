@@ -177,3 +177,10 @@ def test_registry_rejects_unknown_values(tmp_path):
     )
     with pytest.raises(SystemExit, match="layer"):
         load_sources(path)
+
+
+def test_number_tables_are_not_indexed():
+    from compliance_advisor.chunker import mostly_text
+
+    assert not mostly_text("76 98 80 82 85 75 NP\n77 99 81 83 86 76 NR")
+    assert mostly_text("Art. 19 DORA: Financial entities shall report major incidents within 4 hours.")
