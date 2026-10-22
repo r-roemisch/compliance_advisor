@@ -16,6 +16,14 @@ _Avoid_: User, client, customer, end user
 The regulated financial entity a question is about, supervised in Germany.
 _Avoid_: Company, institution, bank, entity
 
+**Compliance Function**:
+The organisational unit a Firm must maintain to identify and manage its compliance risk, as required for banks by MaRisk and for insurers by Solvency II.
+_Avoid_: Compliance department, compliance team
+
+**Firm Profile**:
+The stated facts about a Firm that decide which rules apply to it: its type (for example significant bank, primary insurer, reinsurer), its size class and its activities.
+_Avoid_: Settings, company profile, persona
+
 **Customer**:
 A customer of the Firm, for example the subject of a know-your-customer check. Never the person using the app.
 _Avoid_: Client, end user
@@ -38,8 +46,24 @@ _Avoid_: Knowledge base, database, index (in domain talk)
 One indexed piece of a Source: the unit that is retrieved and cited.
 _Avoid_: Chunk (in domain talk), document, snippet
 
+**Obligation**:
+A duty a provision imposes on a Firm, with its addressee, the action required, a deadline where one applies, and the provision it comes from.
+_Avoid_: Requirement, rule, duty (when this is meant)
+
+**Provision**:
+The smallest citable unit of a Source: an article, a paragraph (§) or a numbered section of a guideline.
+_Avoid_: Clause, rule, section (when a law is meant)
+
+**Legal Status**:
+Where a Source stands: in force, applicable from a later date, or a pending proposal that is not yet law.
+_Avoid_: Validity, version
+
+**Milestone**:
+A dated event in a Regime's life that matters to a Firm, such as the date from which a regulation applies.
+_Avoid_: Deadline (unless an Obligation's own due date is meant), event
+
 **Regime**:
-A body of rules referred to as one unit, such as DORA, anti-money laundering or payment services. A Regime spans several Regulatory Layers.
+A body of rules referred to as one unit, such as DORA, anti-money laundering, Solvency II or the AI Act. A Regime spans several Regulatory Layers.
 _Avoid_: Law, framework, topic, area
 
 **Regulatory Layer**:

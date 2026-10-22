@@ -21,6 +21,28 @@ docker compose up --build          # postgres, backend, frontend
 
 Then open **http://localhost:3010**. The backend API runs on port 8010 and Postgres on port 5433. The Corpus must be filled once, as described in the next section; it is kept in a Docker volume.
 
+## Trust and data
+
+A compliance team can only use an answer it can check. These are the Compliance Advisor's rules for that.
+
+**Built**
+
+- **Public Sources only.** The Corpus holds published regulatory texts: EU acts, German acts and BaFin guidance. There is no upload, and no internal document of any Firm is stored.
+- **Official publishers.** Every Source is downloaded from its official publisher: the EU Publications Office, gesetze-im-internet.de or BaFin. The download date and a checksum of each file are kept next to it.
+- **Numbered Citations.** Every statement in an answer cites a numbered Passage. Each Passage shows its Source, issuer, Regulatory Layer and language.
+- **A link to the official text** next to every Passage.
+- **"Not covered" instead of guessing.** When the Passages do not answer a question, the answer says which part is not covered instead of filling the gap from memory.
+- **No compliance verdicts.** The app explains what the rules require; it never says whether a specific Firm is compliant. A permanent notice below the chat says that the answers are not legal advice.
+
+**Planned**
+
+- **Links to the exact provision**, such as Article 17 DORA or § 10 GwG, instead of the whole act.
+- **"As of" dates.** Each Source shows its legal status and the date the app's copy was taken.
+- **Audit trail.** Every question and answer is stored with the exact Source versions used, and can be exported.
+- **"Not covered" made visible** in the interface, not only in the answer text.
+
+**What leaves the app.** The question, together with the retrieved Passages, is sent to the Answer Model through OpenRouter, an external service. Do not enter confidential Firm data or Customer data in a question.
+
 ## Getting the Sources in
 
 For local development, run the database in Docker and the commands with [uv](https://docs.astral.sh/uv/). Inside Docker the same commands work as `docker compose run --rm backend compliance-advisor-ingest`.

@@ -30,14 +30,19 @@ Each answer costs about 0.1 cent.
 - The model sometimes nests citations, as in "[DORA Art. 18(1) [1]]" or "[1, Art. 32 Abs. 1]". The `cited` list handles both.
 - The AMLR question "when does it apply" did not retrieve Article 90 with the application date; the answer says the date is not in the passages.
 
+## Feature session (2026-10-22)
+
+A second grilling session decided the end product and a five-day submission plan, due 2026-10-27. Everything is in `docs/ROADMAP.md` ("The end product" and "Submission plan"), the design brief in `docs/DESIGN-BRIEF.md`, the new terms (Compliance Function, Obligation, Firm Profile, Provision, Legal Status, Milestone) in `CONTEXT.md`, and the no-upload decision in `docs/adr/0004`.
+
 ## Waiting on you
 
-- The design session (step 2): layout, chat flow, how Passages and Citations are shown, streaming.
+- Confirmation that the shared understanding is right, then "go" for day 1.
+- A yes for each new Source download, as before.
 
 ## Next session
 
-1. Step 2, the design session. The current page is deliberately bare and only proves the pipeline.
-2. Then step 3, the evaluation harness, so the weaknesses above can be measured before step 4 fixes them.
+1. Day 1: Passages per Provision with deep links; legal status and Milestones in the registry; about twelve new Sources after your confirmations; probe questions per Regime.
+2. Day 2: four tools, Firm Profile, question pre-check.
 
 ## Agreed prompt (goes into `backend/.../prompt.py` in 1b)
 

@@ -10,6 +10,8 @@ The Compliance Advisor is built step by step, one or more sessions per step, and
 - Ask before downloading any Source; the registry entry is agreed first.
 - Say explicitly when a config file such as `.env.example` or `.env` is created, so it can be filled in.
 - No code, docs or wording are reused from other projects. This project stands on its own.
+- Firm presets describe firm types, never real companies.
+- Every change is measurable: the naive index of the six seed Sources stays as the baseline.
 - Terms live in `CONTEXT.md`; hard-to-reverse decisions in `docs/adr/`; the handoff note for the next session in `last_session.md`.
 
 ## Step 1: Naive RAG (done 2026-10-21)
@@ -61,32 +63,88 @@ Built in three sub-steps with a check-in after each.
 
 Delivers: H1 in full (knowledge base, embeddings, chunking, similarity search); H3 partly (domain, focused knowledge base, domain prompt); H4 (LangChain with OpenRouter, error handling, input validation); H5 partly (Next.js, sources shown, progress indicator); A source citations; C multi-language partly (German and English Sources, answer in the question's language).
 
-## Step 2: Design session, UI layout (next)
+## The end product (decided 2026-10-22)
+
+Audience: the Compliance Officer researching a question, and the Compliance Function as a team on top. Target firms: large banks and insurers supervised in Germany, with smaller firms still possible (ADR 0001 unchanged). Interface in German, with English available.
+
+Jobs the end product supports: research with Citations; an obligation inventory; horizon scanning; case support through tools. Not supported: gap analysis against a Firm's own documents, because nothing is uploaded (ADR 0004).
+
+Regimes: DORA, anti-money laundering and payments (seed); insurance (Solvency II, VAG, IDD, MaGo); banking (CRR, CRD, KWG, MaRisk); digital (AI Act, GDPR). Sustainability (SFDR, taxonomy, CSRD) comes later.
+
+Trust must-haves: links to the exact provision, legal status and "as of" dates, an audit trail with export, "not covered" visible in the interface.
+
+## Submission plan: five days, due 2026-10-27
+
+### Day 1: Sources and Passages (todo)
+
+- Passages per article or paragraph with a provision label such as "Art. 17 DORA" or "§ 10 GwG" and a deep link: EU acts via the article anchors (`#art_17`), German acts via per-paragraph pages (`__10.html`), PDFs via `#page=N`. Overlong provisions are split and keep their label.
+- The naive fixed-size index of the six seed Sources stays as the baseline collection; new Sources are indexed per article only.
+- Registry fields `legal_status` and dated milestones, entered by hand and checked against the official text.
+- About twelve new Sources, each URL confirmed before download: Solvency II Directive, Delegated Regulation 2015/35, VAG, IDD, MaGo; CRR, CRD, KWG, MaRisk; AI Act, GDPR; the DORA standard on incident report deadlines. EU texts in their latest consolidated version. Large texts can be trimmed to listed articles or titles if they crowd out other Sources.
+- After each Regime's ingest: five probe questions, showing which Sources the Passages came from.
+
+### Day 2: Tools and Firm Profile (todo)
+
+- Four rule-check tools written in code: applicability check, compliance timeline, DORA incident classifier, AI Act use-case check. Each result names the provision that decides it.
+- One tool round: the model may call tools once, then answers (at most two model calls).
+- Firm Profile: firm type, size class, activities; kept in the browser; presets by firm type only.
+- Question pre-check: removes IBANs, email addresses and phone numbers before anything leaves the app, and says so.
+- Delivers H2 in full.
+
+### Day 3: Design and frontend (todo)
+
+- The design from `docs/DESIGN-BRIEF.md`; German and English interface.
+- Trust elements, tool results, history list, export (JSON, Markdown, PDF via print), cost per answer in money, model choice including an EU-hosted model.
+- Audit trail: every answer stored with its Passages and Source versions.
+- Delivers H5 in full; A history and export; B token usage and costs; B visualisation of tool results; B multi-model support.
+
+### Day 4: Obligations and evaluation (todo)
+
+- "Extract Obligations" on an answer or provision: addressee, action, deadline, provision with link; each row cites its Passage; CSV export.
+- Timeline view from the registry's milestones.
+- Golden Set of about 20 questions, written after the interface is settled and reviewed by you; retrieval hit rate and Citation validity; the results log, with the naive baseline as first entry.
+- Delivers C evaluation; the basis for C A/B testing.
+
+### Day 5: Buffer and submission (todo)
+
+- Fixes, README walkthrough, demo script, screenshots.
+
+## After the submission
+
+- Stored obligation list across sessions, then team features (shared lists, assignment, second review).
+- Automatic update runs with change records; full horizon scanning.
+- AML due-diligence level and sanctions screening tools; agentic search as a measured alternative.
+- Prompt-injection protection, refusals and escalation triggers; MCP server; rate limiting; analytics dashboard; user accounts.
+- Sustainability Regime (SFDR, taxonomy, CSRD).
+
+## Earlier plan (2026-10-20), superseded by the submission plan above
+
+### Step 2: Design session, UI layout (superseded)
 
 - Decide the layout, the chat flow, how Passages, Citations and later tool results are shown; streaming answers; conversation history
 - Delivers: H5 in full; A conversation history and export; A help feature or guide
 
-## Step 3: Evaluation harness (todo)
+### Step 3: Evaluation harness (todo)
 
 - Golden Set draft and review; retrieval metrics (hit@k, recall, MRR); answer metrics (faithfulness, citation validity)
 - Delivers: C evaluation of the RAG system; the basis for C A/B testing
 
-## Step 4: Retrieval upgrades (todo)
+### Step 4: Retrieval upgrades (todo)
 
 - Structure-aware chunking (per article or paragraph), hybrid search, reranking, side-by-side strategy comparison measured on the Golden Set
 - Delivers: C hybrid search; C A/B testing of RAG strategies; A visualisation of the RAG process
 
-## Step 5: Firm Profile and tools (todo)
+### Step 5: Firm Profile and tools (todo)
 
 - Firm Profile (licence type, size class, activities); tools: applicability check, compliance timeline, DORA incident classifier, AML due-diligence level, sanctions screening
 - Delivers: H2 (at least three tool calls); H3 domain-specific responses; B visualisation of tool call results; B multi-model support
 
-## Step 6: Safety, currency and updates (todo)
+### Step 6: Safety, currency and updates (todo)
 
 - Question pre-check (customer-data stripping, refusals, escalation to the money-laundering officer or counsel); prompt-injection protection; legal status and source currency; update run with change records and change detection per Source
 - Delivers: H3 security measures; B prompt injection protection; B real-time knowledge base updates; C automated knowledge base updates
 
-## Step 7: MCP, operations and polish (todo)
+### Step 7: MCP, operations and polish (todo)
 
 - MCP server for the tools; rate limiting and API key management; logging and monitoring; token usage and cost display; exports (PDF, CSV, JSON) that carry the notice; analytics dashboard; authentication if time allows
 - Delivers: C tools as MCP servers; B rate limiting; B logging; B token usage and costs; B export formats; C analytics dashboard; B authentication
