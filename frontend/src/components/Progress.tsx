@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import { TOOL_NAMES, type Strings } from "@/lib/i18n";
 import type { Lang, Stage } from "@/lib/types";
@@ -46,7 +48,7 @@ export function Progress({
           const index = order.indexOf(step.id);
           const state = index < position ? "done" : index === position ? "active" : "todo";
           return (
-            <li key={step.id} className={`flex items-center gap-2.5 ${state === "todo" ? "text-ink-3" : ""}`}>
+            <li key={step.id} className={`flex flex-wrap items-center gap-x-2.5 gap-y-0.5 ${state === "todo" ? "text-ink-3" : ""}`}>
               <span
                 aria-hidden
                 className={`inline-block h-2.5 w-2.5 rounded-full border ${
@@ -58,10 +60,10 @@ export function Progress({
                 <span className="text-ink-2">({tools.map((n) => TOOL_NAMES[n]?.[lang] ?? n).join(", ")})</span>
               )}
               {step.id === "search" && found && (
-                <span className="text-ink-2">: {t.found(found.count, found.sources.join(", "))}</span>
+                <span className="text-ink-2">– {t.found(found.count, found.sources.join(", "))}</span>
               )}
               {step.id === "model" && profileSet && state !== "todo" && (
-                <span className="text-ink-2">: {t.profileUsed}</span>
+                <span className="text-ink-2">– {t.profileUsed}</span>
               )}
             </li>
           );
@@ -70,10 +72,8 @@ export function Progress({
       <p className="mt-2 text-xs text-ink-3 tabular-nums">{t.elapsed(seconds)}</p>
       {draft && (
         <div className="answer mt-3 border-t border-line pt-3 text-ink-2" aria-live="off">
-          <p className="whitespace-pre-wrap">
-            {draft.replace(/\s*[*_]*\s*Coverage:.*$/i, "")}
-            <span aria-hidden className="ml-0.5 inline-block h-4 w-[2px] translate-y-[3px] animate-pulse bg-accent" />
-          </p>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{draft.replace(/\s*[*_]*\s*Coverage:.*$/i, "")}</ReactMarkdown>
+          <span aria-hidden className="inline-block h-4 w-[2px] animate-pulse bg-accent" />
         </div>
       )}
     </div>

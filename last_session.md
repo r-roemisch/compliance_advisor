@@ -69,16 +69,22 @@ A second grilling session decided the end product and a five-day submission plan
 - Progress panel fixed and made more informative: steps were held back by the proxy's compression; now they arrive live, the search step names its findings, and the answer streams in.
 - 44 tests pass.
 
+## Day 5 (2026-10-23): done
+
+- Per-Source cap off by default; the app now matches the best measured set-up (hit@6 1.00 on the 13 seed questions, 0.92 on all 25).
+- Fresh-install test passed from a clean clone with an empty database, following only the README.
+- README rewritten for reviewers (what it does, screenshots, quick start, how it works, sources, rule checks, trust, evaluation, development, requirements table). `docs/DEMO.md` with a five-minute demo. Screenshots in `docs/screenshots/`.
+- 44 tests pass. Everything committed.
+
 ## Waiting on you
 
-1. Review the Golden Set (`config/golden_set.yaml`, 25 items; instructions at the top). Then I run the final evaluation on the reviewed set.
-2. Decide on the per-Source cap: the evidence says switch it off (`MAX_PER_SOURCE=0`); the named lookup stays.
-3. Still open: a separate form for the incident classifier.
+1. Review the Golden Set (`config/golden_set.yaml`, 25 items, instructions at the top); then I run the final evaluation and replace the draft numbers in the README.
+2. Decide on a separate form for the incident classifier (optional).
+3. If the submission needs a link: create a repository (for example on GitHub) and push; nothing is pushed yet.
 
-## Next session
+## After the submission
 
-1. Final evaluation on the reviewed Golden Set; apply the cap decision.
-2. Day 5: buffer, README walkthrough, demo script, screenshots.
+See "After the submission" in `docs/ROADMAP.md`: stored obligation list and team features, automatic source updates, hybrid search and cross-lingual search, AML due-diligence and sanctions tools, prompt-injection filter, MCP server, rate limiting, dashboard, user accounts, EU Level 3 guidelines and the sustainability regime.
 
 ## Agreed prompt (goes into `backend/.../prompt.py` in 1b)
 

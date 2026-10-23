@@ -117,9 +117,11 @@ Trust must-haves: links to the exact provision, legal status and "as of" dates, 
 - Answer evaluation (draft Golden Set): all answers cite and all citations are valid; answers citing an expected Provision rise from 77 % (naive, 13 questions) to 88 % (app, 25 questions); "full" coverage from 3 of 13 to 15 of 25.
 - Open: your review of the Golden Set, then the decision whether to switch the cap off (`MAX_PER_SOURCE=0`) and a final run on the reviewed set.
 
-### Day 5: Buffer and submission (todo)
+### Day 5: Buffer and submission (done 2026-10-23)
 
 - Fixes, README walkthrough, demo script, screenshots.
+- Done: per-Source cap switched off (`MAX_PER_SOURCE=0`) after the evaluation; fresh-install test from a clean clone into an empty database following the README only (fetch skipped existing files, ingest 5,596 Passages in 2.5 minutes, first answer stored); README rewritten as one path for reviewers with a requirements table; `docs/DEMO.md`; nine screenshots in `docs/screenshots/`; progress panel polished (formatted live text).
+- Still open: your Golden Set review and the final evaluation on the reviewed set; the incident-classifier form; pushing the repository to a host if the submission needs a link.
 
 ## After the submission
 

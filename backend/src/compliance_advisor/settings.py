@@ -18,7 +18,9 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://advisor:advisor@localhost:5433/advisor"
     embedding_model: str = "openai/text-embedding-3-small"
     top_k: int = 6
-    max_per_source: int = 3  # at most this many Passages from one Source; 0 = no cap
+    # At most this many Passages from one Source; 0 = no cap. Off since 2026-10-23: the evaluation
+    # (docs/EVALUATION.md) showed the cap costs hits; the direct lookup of named Provisions stays.
+    max_per_source: int = 0
     candidates: int = 24  # Passages fetched before the cap is applied
     chunker: str = "provision"  # provision | fixed (the naive baseline)
     chunk_size: int = 1000  # fixed chunker

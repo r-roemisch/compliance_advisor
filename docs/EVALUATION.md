@@ -37,6 +37,8 @@ points to a Passage that does not exist; *cites expected*: the answer cites an e
 | 2026-10-23T07:23 | answers: naive baseline vs app (draft Golden Set) | draft | naive (seed) | 13 | 0.77 | 0.77 | 0.67 |
 | 2026-10-23T07:23 | answers: naive baseline vs app (draft Golden Set) | draft | app (seed) | 13 | 0.92 | 0.90 | 0.69 |
 | 2026-10-23T07:23 | answers: naive baseline vs app (draft Golden Set) | draft | app (all) | 25 | 0.88 | 0.81 | 0.72 |
+| 2026-10-23T08:02 | app with cap off (draft Golden Set) | draft | app (seed) | 13 | 1.00 | 0.96 | 0.69 |
+| 2026-10-23T08:02 | app with cap off (draft Golden Set) | draft | app (all) | 25 | 0.92 | 0.86 | 0.72 |
 
 ## Answers
 
