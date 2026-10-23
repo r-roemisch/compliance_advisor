@@ -12,3 +12,6 @@ __pycache__/
 node_modules/
 .next/
 *.tsbuildinfo
+soft_requirements.txt
+hard_requirements.txt
+last_session.md
