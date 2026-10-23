@@ -68,19 +68,26 @@ export type HistoryItem = { id: string; created_at: string; question: string; mo
 
 export type User = { id: string; email: string; name: string; profile: FirmProfile | null };
 
+export type QuestionRow = {
+  id: string;
+  created_at: string;
+  question: string;
+  model: string;
+  regimes: string[];
+  tools: string[];
+  obligation_count: number;
+};
+
 export type DashboardData = {
   user: User;
-  stats: {
-    questions: number;
-    cost_usd: number;
-    obligations: number;
-    answers_with_obligations: number;
-    first_question_at: string | null;
-    last_question_at: string | null;
-  };
+  stats: { questions: number; questions_7d: number; obligations: number };
+  activity: { date: string; count: number }[];
+  regimes: { regime: string; count: number }[];
+  recent: QuestionRow[];
   upcoming: TimelineEntry[];
-  recent: HistoryItem[];
 };
+
+export type InventoryRow = ObligationRow & { answer_id: string; question: string; created_at: string };
 
 export type Stage = "search" | "model" | "tools" | "writing";
 export type StreamEvent =

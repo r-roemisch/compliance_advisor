@@ -19,7 +19,7 @@ Built as a Turing College bootcamp project. German interface by default, English
 - **Timeline** of all dated milestones, or only those that apply to the Firm Profile.
 - **Audit trail**: every answer is stored with the exact source versions it used and can be exported as Markdown, JSON or PDF.
 - **Honest progress**: the steps appear as they happen, the search step names what it found, and the answer appears while it is written.
-- **Accounts and dashboard** (optional): sign up with email and password; your questions, answers and Firm Profile stay private to you. The dashboard shows your key figures, your Firm Profile, the upcoming dates for it, and a searchable archive of all your questions. Deleting the account deletes its answers.
+- **Accounts and dashboard** (optional): sign up with email and password; your questions, answers and Firm Profile stay private to you. The dashboard has five sections: an overview (questions and extracted obligations, the next date, questions per day, most-asked topics, latest questions), a searchable table of all your questions with their topics and rule checks, all your extracted obligations in one table with CSV export, the upcoming dates for your Firm Profile, and profile and account settings. Deleting the account deletes its answers.
 - **Model choice** including an EU-hosted model (Mistral Large 4 on Mistral AI's own servers), with tokens and cost shown for every answer.
 
 | Answer being written | Rule check | Obligations |
@@ -165,7 +165,8 @@ cd ../frontend && npm install && npm run dev           # page on :3010, /api for
 | `POST /api/history/{id}/obligations` | Extracts the obligations behind a stored answer and stores them |
 | `POST /api/timeline` | Milestones, optionally only for a Firm Profile and only upcoming ones |
 | `POST /api/auth/register`, `/login`, `/logout`; `GET /api/auth/me` | Accounts; the session is an httpOnly cookie |
-| `PUT /api/me/profile`, `GET /api/me/dashboard`, `DELETE /api/me` | Save the Firm Profile, dashboard data, delete the account with its answers |
+| `PUT /api/me/profile`, `DELETE /api/me` | Save the Firm Profile; delete the account with its answers |
+| `GET /api/me/dashboard`, `/api/me/questions?q=`, `/api/me/obligations` | Dashboard overview; all own questions with topics and rule checks; all own extracted obligations |
 | `GET /api/health` | Backend and database status |
 
 Errors come back as `{"detail": "..."}`: 422 for invalid input, 502 when OpenRouter does not respond, 503 when the database is not reachable.

@@ -78,7 +78,7 @@ export function Header(props: {
           </select>
         </label>
 
-        <div className="flex items-center gap-3 text-sm">
+        <div className="flex flex-wrap items-center gap-3 text-sm">
           <fieldset className="flex overflow-hidden rounded border border-line" aria-label={t.language}>
             {(["de", "en"] as const).map((l) => (
               <button
@@ -94,7 +94,7 @@ export function Header(props: {
           </fieldset>
           {props.user ? (
             <span className="flex items-center gap-2">
-              <span className="max-w-[12rem] truncate text-ink-2" title={props.user.email}>
+              <span className="hidden max-w-[12rem] truncate text-ink-2 sm:inline" title={props.user.email}>
                 {props.user.name || props.user.email}
               </span>
               <button type="button" onClick={props.onSignOut} className="rounded border border-line px-2.5 py-1.5 hover:border-ink-3">

@@ -127,7 +127,7 @@ Trust must-haves: links to the exact provision, legal status and "as of" dates, 
 
 - Optional accounts with email and password (scrypt hashes, hashed session tokens in an httpOnly cookie); answers private to their account; guest mode unchanged (ADR 0005).
 - Firm Profile saved to the account; a guest profile is taken over on first login if the account has none.
-- Dashboard at `/dashboard`: key figures, Firm Profile, upcoming dates for it, searchable archive of all own questions; account deletion removes the answers too.
+- Dashboard at `/dashboard`, reworked after feedback (no cost, no first-question date; structure modelled on the OpenRouter dashboard): section menu with overview (key figures, questions per day, most-asked topics, latest questions), questions table with search, all extracted obligations in one table with CSV (a first stored obligation inventory), upcoming dates for the Firm Profile, profile and account; account deletion removes the answers too.
 - Not yet: email verification, password reset, login through an identity provider such as Microsoft Entra ID.
 
 ## After the submission

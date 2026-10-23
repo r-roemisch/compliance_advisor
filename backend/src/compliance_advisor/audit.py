@@ -5,7 +5,7 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
-from sqlalchemy import Column, DateTime, MetaData, String, Table, Text, func, select, text, update
+from sqlalchemy import Column, DateTime, MetaData, String, Table, Text, select, text, update
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.engine import Engine
 
@@ -37,6 +37,10 @@ def source_versions(raw_dir: Path, source_ids: set[str]) -> dict[str, dict]:
         except (OSError, ValueError, KeyError):
             versions[source_id] = {}
     return versions
+
+
+# A Rule Check names its Regime more reliably than the retrieved Passages do.
+_TOOL_REGIMES = {"classify_dora_incident": "dora", "check_ai_act_use_case": "digital"}
 
 
 class AuditStore:
@@ -102,30 +106,48 @@ class AuditStore:
         with self.engine.connect() as connection:
             return [dict(row._mapping) for row in connection.execute(query)]
 
-    def stats(self, user_id: str) -> dict:
-        """Key figures for the dashboard."""
-        owned = self._owned_by(user_id)
-        cost = answers.c.response["usage"]["cost_usd"].as_float()
+    def records(self, user_id: str, search: str = "") -> list[dict]:
+        """One row per stored answer of an account, with what the dashboard summarises."""
+        query = select(
+            answers.c.id,
+            answers.c.created_at,
+            answers.c.question,
+            answers.c.model,
+            answers.c.response["passages"].label("passages"),
+            answers.c.response["cited"].label("cited"),
+            answers.c.response["tools"].label("tools"),
+            answers.c.obligations,
+        ).where(self._owned_by(user_id))
+        if search.strip():
+            query = query.where(answers.c.question.ilike(f"%{search.strip()}%"))
         with self.engine.connect() as connection:
-            count, total_cost, first, last = connection.execute(
-                select(
-                    func.count(),
-                    func.coalesce(func.sum(cost), 0.0),
-                    func.min(answers.c.created_at),
-                    func.max(answers.c.created_at),
-                ).where(owned)
-            ).one()
-            rows = connection.execute(
-                select(answers.c.obligations).where(owned, answers.c.obligations.isnot(None))
-            ).all()
-        return {
-            "questions": count,
-            "cost_usd": round(float(total_cost), 4),
-            "obligations": sum(len(r[0] or []) for r in rows),
-            "answers_with_obligations": len(rows),
-            "first_question_at": first,
-            "last_question_at": last,
-        }
+            rows = connection.execute(query.order_by(answers.c.created_at.desc())).all()
+        result = []
+        for r in rows:
+            passages = r.passages or []
+            cited = set(r.cited or [])
+            used = [p for p in passages if p.get("n") in cited] or passages
+            result.append(
+                {
+                    "id": r.id,
+                    "created_at": r.created_at,
+                    "question": r.question,
+                    "model": r.model,
+                    "regimes": list(
+                        dict.fromkeys(
+                            [
+                                _TOOL_REGIMES[t.get("name")]
+                                for t in (r.tools or [])
+                                if t.get("name") in _TOOL_REGIMES
+                            ]
+                            + [p.get("regime") for p in used if p.get("regime")]
+                        )
+                    ),
+                    "tools": list(dict.fromkeys(t.get("name") for t in (r.tools or []))),
+                    "obligations": r.obligations or [],
+                }
+            )
+        return result
 
     def get(self, answer_id: str) -> dict | None:
         with self.engine.connect() as connection:

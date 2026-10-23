@@ -4,7 +4,7 @@ import json
 import logging
 import queue
 import threading
-from datetime import date
+from datetime import date, timedelta
 from functools import lru_cache
 from typing import Annotated
 
@@ -437,18 +437,74 @@ def save_profile(body: ProfileUpdate, user: User) -> dict:
 
 @app.get("/api/me/dashboard")
 def dashboard(user: User, audit: Annotated[AuditStore | None, Depends(get_audit)]) -> dict:
-    """Key figures, upcoming Milestones for the saved Firm Profile, and the latest questions."""
+    """Overview: key figures, questions per day (30 days), Regimes asked about, latest questions,
+    and the upcoming Milestones for the saved Firm Profile."""
     user = _require(user)
     if audit is None:
         raise DatabaseError("the database is not reachable")
+    records = audit.records(user["id"])
+    today = date.today()
+    days = [today - timedelta(days=i) for i in range(29, -1, -1)]
+    per_day = {d: 0 for d in days}
+    for r in records:
+        day = r["created_at"].date()
+        if day in per_day:
+            per_day[day] += 1
+    regimes: dict[str, int] = {}
+    for r in records:
+        for regime in r["regimes"]:
+            regimes[regime] = regimes.get(regime, 0) + 1
     profile = FirmProfile(**user["profile"]) if user["profile"] else None
-    upcoming = timeline(TimelineRequest(profile=profile, upcoming_only=True))["entries"][:6]
+    upcoming = timeline(TimelineRequest(profile=profile, upcoming_only=True))["entries"]
     return {
         "user": public(user),
-        "stats": audit.stats(user["id"]),
-        "upcoming": upcoming,
-        "recent": audit.recent(user["id"], "", 5),
+        "stats": {
+            "questions": len(records),
+            "questions_7d": sum(per_day[d] for d in days[-7:]),
+            "obligations": sum(len(r["obligations"]) for r in records),
+        },
+        "activity": [{"date": d.isoformat(), "count": per_day[d]} for d in days],
+        "regimes": sorted(
+            ({"regime": k, "count": v} for k, v in regimes.items()), key=lambda x: -x["count"]
+        ),
+        "recent": [
+            {k: v for k, v in r.items() if k != "obligations"}
+            | {"obligation_count": len(r["obligations"])}
+            for r in records[:5]
+        ],
+        "upcoming": upcoming[:8],
     }
+
+
+@app.get("/api/me/questions")
+def my_questions(
+    user: User, audit: Annotated[AuditStore | None, Depends(get_audit)], q: str = ""
+) -> dict:
+    """All questions of the account, newest first, with Regimes, Rule Checks and obligation count."""
+    user = _require(user)
+    if audit is None:
+        raise DatabaseError("the database is not reachable")
+    return {
+        "items": [
+            {k: v for k, v in r.items() if k != "obligations"}
+            | {"obligation_count": len(r["obligations"])}
+            for r in audit.records(user["id"], q[:200])
+        ]
+    }
+
+
+@app.get("/api/me/obligations")
+def my_obligations(user: User, audit: Annotated[AuditStore | None, Depends(get_audit)]) -> dict:
+    """Every extracted Obligation of the account, with the question it came from."""
+    user = _require(user)
+    if audit is None:
+        raise DatabaseError("the database is not reachable")
+    rows = [
+        {**o, "answer_id": r["id"], "question": r["question"], "created_at": r["created_at"]}
+        for r in audit.records(user["id"])
+        for o in r["obligations"]
+    ]
+    return {"rows": rows}
 
 
 @app.delete("/api/me")

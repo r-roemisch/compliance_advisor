@@ -22,6 +22,7 @@
   --red-soft: #fbe6e3;
   --ok: #1f6b3a;
   --mark: #fff1b8;         /* highlight of the active citation's passage */
+  --chart: #00909c;        /* chart marks; validated (dataviz checks) on the light panel */
   color-scheme: light;
 }
 
@@ -42,6 +43,7 @@
   --red-soft: #3c1d1e;
   --ok: #7fcf98;
   --mark: #3d3a1c;
+  --chart: #1fa3ad;        /* validated on the dark panel */
   color-scheme: dark;
 }
 
@@ -63,6 +65,7 @@
     --red-soft: #3c1d1e;
     --ok: #7fcf98;
     --mark: #3d3a1c;
+    --chart: #1fa3ad;
     color-scheme: dark;
   }
 }
@@ -84,6 +87,7 @@
   --color-red-soft: var(--red-soft);
   --color-ok: var(--ok);
   --color-mark: var(--mark);
+  --color-chart: var(--chart);
   --font-sans: var(--font-plex-sans), system-ui, sans-serif;
   --font-serif: var(--font-plex-serif), Georgia, serif;
   --font-cond: var(--font-plex-cond), var(--font-plex-sans), sans-serif;

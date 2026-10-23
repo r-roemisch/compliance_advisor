@@ -1,4 +1,4 @@
-import type { AskResponse, DashboardData, FirmProfile, HistoryItem, ModelOption, ObligationRow, Preset, SourceInfo, StreamEvent, TimelineEntry, User } from "./types";
+import type { AskResponse, DashboardData, FirmProfile, HistoryItem, InventoryRow, ModelOption, ObligationRow, Preset, QuestionRow, SourceInfo, StreamEvent, TimelineEntry, User } from "./types";
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -120,3 +120,6 @@ export const saveProfile = (profile: FirmProfile | null) =>
   send<{ user: User }>("PUT", "/api/me/profile", { profile }).then((d) => d.user);
 export const loadDashboard = () => getJson<DashboardData>("/api/me/dashboard");
 export const deleteAccount = () => send<{ deleted: boolean; answers_removed: number }>("DELETE", "/api/me");
+export const loadMyQuestions = (search = "") =>
+  getJson<{ items: QuestionRow[] }>(`/api/me/questions?q=${encodeURIComponent(search)}`).then((d) => d.items);
+export const loadMyObligations = () => getJson<{ rows: InventoryRow[] }>("/api/me/obligations").then((d) => d.rows);

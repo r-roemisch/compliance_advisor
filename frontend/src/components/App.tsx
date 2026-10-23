@@ -260,7 +260,12 @@ export default function App({ initialView = "research" }: { initialView?: View }
               go("research");
               openStored(id);
             }}
-            onSignedOut={signedOut}
+            onSignOut={signOut}
+            onNewQuestion={() => {
+              go("research");
+              startNew();
+            }}
+            onDeleted={signedOut}
           />
         </main>
       ) : (
