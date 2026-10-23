@@ -106,12 +106,16 @@ Trust must-haves: links to the exact provision, legal status and "as of" dates, 
 - Not built: a separate form for the incident classifier (left open). Rule-check details (reasons, deadlines) are generated in English also in the German interface; the labels around them are translated.
 - Seen in tests: Mistral answers take about 60 seconds and cost about 2.5 cents; GPT-6 Luna about 15 seconds and 0.15 cent. For broad planning questions the model may call only the applicability check, not the timeline.
 
-### Day 4: Obligations and evaluation (todo)
+### Day 4: Obligations and evaluation (done 2026-10-23: obligations, timeline, Golden Set draft, evaluation log, 42 tests)
 
 - "Extract Obligations" on an answer or provision: addressee, action, deadline, provision with link; each row cites its Passage; CSV export.
 - Timeline view from the registry's milestones.
 - Golden Set of about 20 questions, written after the interface is settled and reviewed by you; retrieval hit rate and Citation validity; the results log, with the naive baseline as first entry.
 - Delivers C evaluation; the basis for C A/B testing.
+- Added during the build: five retrieval set-ups are measured separately (naive, provision, lookup, cap, app). Draft results: cutting per Provision raises hit@6 on the seed questions from 0.77 to 1.00; the named lookup adds hits (0.88 to 0.92 on all questions); the per-Source cap costs hits (it pushed Art. 18 DORA out for the major-incident question) and helps only the crowding case's rank. A crowding case was added to the Golden Set so the trade-off stays measured.
+- Progress made trustworthy (asked for on 2026-10-23): the steps reached the browser only at the end, because the Next.js server compressed the stream; the stream is now marked `no-transform`. The model's output is streamed, so "writing" is reported when the first words arrive and the answer appears word by word; the search step names what it found. No artificial delay was added. Streamed replies carry no cost from OpenRouter, so cost is computed from OpenRouter's per-token list prices.
+- Answer evaluation (draft Golden Set): all answers cite and all citations are valid; answers citing an expected Provision rise from 77 % (naive, 13 questions) to 88 % (app, 25 questions); "full" coverage from 3 of 13 to 15 of 25.
+- Open: your review of the Golden Set, then the decision whether to switch the cap off (`MAX_PER_SOURCE=0`) and a final run on the reviewed set.
 
 ### Day 5: Buffer and submission (todo)
 

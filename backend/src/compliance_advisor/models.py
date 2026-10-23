@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import httpx
 import yaml
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel
@@ -37,7 +38,27 @@ def chat_model(option: ModelOption, settings: Settings) -> ChatOpenAI:
         max_retries=1,
         default_headers={"X-Title": "Compliance Advisor"},
         extra_body=extra,
+        stream_usage=True,  # token counts also when the answer is streamed
     )
+
+
+_PRICES: dict[str, tuple[float, float]] = {}
+
+
+def list_price(model_id: str) -> tuple[float, float] | None:
+    """OpenRouter's per-token list prices (input, output) in dollars, fetched once."""
+    if not _PRICES:
+        try:
+            data = httpx.get("https://openrouter.ai/api/v1/models", timeout=15).json()["data"]
+            for m in data:
+                pricing = m.get("pricing") or {}
+                _PRICES[m["id"]] = (
+                    float(pricing.get("prompt") or 0),
+                    float(pricing.get("completion") or 0),
+                )
+        except (httpx.HTTPError, ValueError, KeyError):
+            return None
+    return _PRICES.get(model_id)
 
 
 def chat_models(settings: Settings) -> dict[str, ChatOpenAI]:

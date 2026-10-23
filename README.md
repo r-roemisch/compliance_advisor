@@ -8,7 +8,7 @@ Built step by step as a Turing College bootcamp project. The plan and the curren
 
 ## Status
 
-Step 1, a naive RAG, is done. Day 1 of the five-day submission plan in [`docs/ROADMAP.md`](docs/ROADMAP.md) is done too: 18 Sources cut into Provisions, each with a link to the exact article or paragraph, its Legal Status and dated Milestones. Day 2 added four Rule Checks the model can call, the Firm Profile with presets, and a pre-check that removes personal data. Day 3 added the designed interface in German and English, the audit trail with history and export, cost per answer and a choice of Answer Model including one hosted in the EU.
+Step 1, a naive RAG, is done. Day 1 of the five-day submission plan in [`docs/ROADMAP.md`](docs/ROADMAP.md) is done too: 18 Sources cut into Provisions, each with a link to the exact article or paragraph, its Legal Status and dated Milestones. Day 2 added four Rule Checks the model can call, the Firm Profile with presets, and a pre-check that removes personal data. Day 3 added the designed interface in German and English, the audit trail with history and export, cost per answer and a choice of Answer Model including one hosted in the EU. Day 4 added Extract Obligations, the timeline view, a Golden Set of test questions and the evaluation log.
 
 ## Quick start
 
@@ -80,6 +80,8 @@ The page in development: `cd frontend && npm install && npm run dev`, then http:
 | `GET /api/history` | Lists stored answers, newest first |
 | `GET /api/history/{id}` | One stored answer with its Firm Profile and Source versions |
 | `GET /api/history/{id}/export?format=md\|json` | Downloads one stored answer as Markdown or JSON |
+| `POST /api/history/{id}/obligations` | Extracts the Obligations behind a stored answer and stores them |
+| `POST /api/timeline` | Milestones, optionally only for a Firm Profile and only upcoming ones |
 
 Errors come back as `{"detail": "..."}`: 422 for invalid input, 502 when OpenRouter does not respond, 503 when the database is not reachable. The interactive API documentation is at http://localhost:8010/docs.
 
@@ -87,7 +89,7 @@ Errors come back as `{"detail": "..."}`: 422 for invalid input, 502 when OpenRou
 
 Open http://localhost:3010. German is the default; English is one switch away, and the theme follows the system or can be set to light or dark.
 
-- **Ask** a question; the steps the backend is working on appear as they happen (searching the Sources, analysing the question, running rule checks, writing the answer).
+- **Ask** a question; the steps the backend is working on appear as they happen: searching the Sources (with how many were found and from which Sources), analysing the question (noting when the Firm Profile is used), running rule checks, writing the answer. The answer appears word by word while it is written.
 - **Read the answer** with Citation chips. Clicking a chip highlights its Passage beside the answer; Passages show their Provision, Regulatory Layer, Legal Status, "as of" date and a link to the exact Provision.
 - **The layer glyph** next to each Passage shows where it sits in the stack, from EU Level 1 at the top to BaFin practice at the bottom; binding law is drawn solid, supervisory expectation outlined. Below the answer, a strip shows which layers the answer drew on.
 - **Coverage** is shown when the Sources answer a question only in part or not at all.
@@ -96,6 +98,21 @@ Open http://localhost:3010. German is the default; English is one switch away, a
 - **Model**: GPT-6 Luna (default), Mistral Large 4 hosted in the EU by Mistral AI, or Claude Sonnet 5.5. The choice list lives in `config/models.yaml`.
 - **History**: every answer is stored with the exact Source versions it used (download date and checksum) and can be reopened, exported as Markdown or JSON, or printed as PDF.
 - **Cost**: tokens and the cost OpenRouter reports are shown under each answer.
+- **Extract obligations** under an answer: a table of who must do what, by when, with the Provision and a link, built from the cited Passages only. The Provision and link come from the Passage, never from the model. Download as CSV (semicolons, opens in German Excel); the rows are stored with the answer and appear in its export.
+- **Timeline** tab: the dated Milestones of all Sources, or only of those the Firm Profile makes applicable, past or upcoming.
+
+## Evaluation
+
+`config/golden_set.yaml` holds the Golden Set: test questions, each with the Provisions a good search must find. Thirteen can be answered from the first six Sources, so the naive step 1 index can be compared on them.
+
+```bash
+cd backend
+uv run compliance-advisor-eval --label "what changed"            # retrieval: naive, provision, app
+uv run compliance-advisor-eval --label "..." --setups lookup cap # each retrieval change on its own
+uv run compliance-advisor-eval --label "..." --answers           # also generate and score answers (a few cents)
+```
+
+Every run is appended to `evaluation/results.jsonl` and summarised in [`docs/EVALUATION.md`](docs/EVALUATION.md); per-question details go to `data/eval/`.
 
 ## Rule checks and the Firm Profile
 

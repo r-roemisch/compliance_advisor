@@ -40,6 +40,7 @@ export type AskResponse = {
   model: string;
   usage: Usage;
   disclaimer: string;
+  obligations?: ObligationRow[] | null; // when reopened from the history
 };
 
 export type FirmProfile = { firm_type: string; size: string; customers: string; activities: string[] };
@@ -68,7 +69,13 @@ export type HistoryItem = { id: string; created_at: string; question: string; mo
 export type Stage = "search" | "model" | "tools" | "writing";
 export type StreamEvent =
   | { stage: Stage; tools?: string[]; redactions?: string[] }
+  | { stage: "found"; count: number; sources: string[] }
+  | { stage: "delta"; text: string }
   | { stage: "done"; result: AskResponse }
   | { stage: "error"; status: number; detail: string };
 
 export type Ref = { provision: string; link: string };
+
+export type ObligationRow = { addressee: string; action: string; deadline: string; provision: string; link: string; passage: number };
+
+export type TimelineEntry = { date: string; status: "past" | "upcoming"; days_from_today: number; source: string; regime: string; what: string; link: string };

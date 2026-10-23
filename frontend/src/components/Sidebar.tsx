@@ -3,8 +3,9 @@
 import { useState } from "react";
 
 import { LEGAL_STATUS, REGIMES, type Strings } from "@/lib/i18n";
-import type { HistoryItem, Lang, SourceInfo } from "@/lib/types";
+import type { FirmProfile, HistoryItem, Lang, SourceInfo } from "@/lib/types";
 import { LayerGlyph, layerName } from "./LayerGlyph";
+import { TimelinePanel } from "./TimelinePanel";
 
 export function Sidebar(props: {
   t: Strings;
@@ -12,11 +13,12 @@ export function Sidebar(props: {
   history: HistoryItem[];
   sources: SourceInfo[];
   currentId: string | null;
+  profile: FirmProfile | null;
   onOpen: (id: string) => void;
   onNew: () => void;
 }) {
   const { t, lang, history, sources } = props;
-  const [tab, setTab] = useState<"history" | "sources">("history");
+  const [tab, setTab] = useState<"history" | "timeline" | "sources">("history");
   const fmt = new Intl.DateTimeFormat(lang === "de" ? "de-DE" : "en-GB", {
     day: "2-digit",
     month: "2-digit",
@@ -37,7 +39,7 @@ export function Sidebar(props: {
         {t.newQuestion}
       </button>
       <div role="tablist" className="flex border-b border-line text-sm">
-        {(["history", "sources"] as const).map((id) => (
+        {(["history", "timeline", "sources"] as const).map((id) => (
           <button
             key={id}
             role="tab"
@@ -46,13 +48,15 @@ export function Sidebar(props: {
             onClick={() => setTab(id)}
             className={`-mb-px border-b-2 px-3 py-1.5 ${tab === id ? "border-ink font-medium" : "border-transparent text-ink-2"}`}
           >
-            {id === "history" ? t.history : t.sources}
+            {id === "history" ? t.history : id === "timeline" ? t.timeline : t.sources}
           </button>
         ))}
       </div>
 
       <div role="tabpanel" className="min-h-0 overflow-y-auto pr-1">
-        {tab === "history" ? (
+        {tab === "timeline" ? (
+          <TimelinePanel t={t} lang={lang} profile={props.profile} />
+        ) : tab === "history" ? (
           history.length === 0 ? (
             <p className="text-sm text-ink-3">{t.historyEmpty}</p>
           ) : (

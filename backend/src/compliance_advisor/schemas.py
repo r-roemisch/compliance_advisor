@@ -67,6 +67,11 @@ class AskResponse(BaseModel):
     disclaimer: str
 
 
+class TimelineRequest(BaseModel):
+    profile: FirmProfile | None = None
+    upcoming_only: bool = False
+
+
 class SourceOut(BaseModel):
     id: str
     title: str

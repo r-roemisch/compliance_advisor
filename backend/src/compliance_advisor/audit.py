@@ -5,7 +5,7 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
-from sqlalchemy import Column, DateTime, MetaData, String, Table, Text, select
+from sqlalchemy import Column, DateTime, MetaData, String, Table, Text, select, text, update
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.engine import Engine
 
@@ -22,6 +22,7 @@ answers = Table(
     Column("model", String(200), nullable=False),
     Column("response", JSONB, nullable=False),  # the full response as the interface saw it
     Column("source_versions", JSONB, nullable=False),
+    Column("obligations", JSONB),  # rows from "Extract Obligations", if run
 )
 
 
@@ -42,6 +43,10 @@ class AuditStore:
         self.engine = engine
         self.raw_dir = raw_dir
         metadata.create_all(engine, checkfirst=True)
+        with engine.begin() as connection:  # tables created before the obligations column existed
+            connection.execute(
+                text("alter table answers add column if not exists obligations jsonb")
+            )
 
     def save(self, response: AskResponse, profile: dict | None) -> AskResponse:
         response = response.model_copy(
@@ -61,6 +66,12 @@ class AuditStore:
                 )
             )
         return response
+
+    def save_obligations(self, answer_id: str, rows: list[dict]) -> None:
+        with self.engine.begin() as connection:
+            connection.execute(
+                update(answers).where(answers.c.id == answer_id).values(obligations=rows)
+            )
 
     def recent(self, limit: int = 50) -> list[dict]:
         query = (
@@ -120,6 +131,22 @@ def to_markdown(record: dict) -> str:
             "> " + p["text"].replace("\n", "\n> "),
             "",
         ]
+    if record.get("obligations"):
+        lines += [
+            "## Obligations",
+            "",
+            "| Addressee | Action | Deadline | Provision |",
+            "|---|---|---|---|",
+        ]
+        for o in record["obligations"]:
+            cells = [
+                o["addressee"],
+                o["action"],
+                o["deadline"] or "–",
+                f"[{o['provision']}]({o['link']})",
+            ]
+            lines.append("| " + " | ".join(c.replace("|", "/") for c in cells) + " |")
+        lines.append("")
     lines += ["## Source versions", ""]
     for source_id, v in record["source_versions"].items():
         lines.append(

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AnswerView } from "./AnswerView";
 import { Composer } from "./Composer";
 import { Header } from "./Header";
+import { Obligations } from "./Obligations";
 import { PassageList } from "./PassageList";
 import { ProfileDialog } from "./ProfileDialog";
 import { Progress } from "./Progress";
@@ -31,6 +32,8 @@ export default function App() {
   const [result, setResult] = useState<AskResponse | null>(null);
   const [stage, setStage] = useState<Stage | null>(null);
   const [tools, setTools] = useState<string[]>([]);
+  const [found, setFound] = useState<{ count: number; sources: string[] } | null>(null);
+  const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [active, setActive] = useState<number | null>(null);
   const [hover, setHover] = useState<number | null>(null);
@@ -84,6 +87,8 @@ export default function App() {
     setResult(null);
     setActive(null);
     setTools([]);
+    setFound(null);
+    setDraft("");
     setStage("search");
     try {
       await askStream(
@@ -93,12 +98,17 @@ export default function App() {
             setResult(event.result);
             setStage(null);
             loadHistory().then(setHistory).catch(() => undefined);
+          } else if (event.stage === "found") {
+            setFound({ count: event.count, sources: event.sources });
+          } else if (event.stage === "delta") {
+            setDraft((d) => d + event.text);
           } else if (event.stage === "error") {
             setError(`${t.errorPrefix} ${event.detail}`);
             setStage(null);
           } else {
             setStage(event.stage);
-            if (event.tools) setTools(event.tools);
+            if (event.stage === "writing") setDraft("");
+            if ("tools" in event && event.tools) setTools(event.tools);
           }
         },
         controller.signal,
@@ -169,6 +179,7 @@ export default function App() {
           history={history}
           sources={sources}
           currentId={result?.id ?? null}
+          profile={profile}
           onOpen={openStored}
           onNew={startNew}
         />
@@ -188,7 +199,9 @@ export default function App() {
           )}
 
           <div className="mt-5">
-            {busy && stage && <Progress t={t} lang={lang} stage={stage} tools={tools} />}
+            {busy && stage && (
+              <Progress t={t} lang={lang} stage={stage} tools={tools} found={found} profileSet={profile !== null} draft={draft} />
+            )}
 
             {!busy && !result && (
               <section className="max-w-[70ch] py-2">
@@ -218,6 +231,7 @@ export default function App() {
               <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,460px)]">
                 <div className="min-w-0">
                   <AnswerView t={t} lang={lang} result={result} active={highlighted} onCite={cite} onHover={setHover} />
+                  {result.id && <Obligations key={result.id} t={t} answerId={result.id} initial={result.obligations ?? null} />}
                   <ToolCards t={t} lang={lang} tools={result.tools} />
                 </div>
                 <div className="min-w-0 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto xl:pr-1 print-full">

@@ -4,9 +4,11 @@ import json
 import logging
 import queue
 import threading
+from datetime import date
 from functools import lru_cache
 from typing import Annotated
 
+import openai
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -17,15 +19,16 @@ from sqlalchemy.exc import SQLAlchemyError
 from .answer import AnswerService, DatabaseError, UpstreamError
 from .audit import AuditStore, to_markdown
 from .embeddings import get_embeddings
-from .models import chat_models, load_models
+from .models import chat_model, chat_models, list_price, load_models
+from .obligations import extract_obligations
 from .profile import PRESETS, FirmProfile
 from .prompt import DISCLAIMER
 from .registry import load_sources
 from .retriever import Retriever
-from .schemas import AskRequest, AskResponse, SourceOut, SourcesResponse
+from .schemas import AskRequest, AskResponse, SourceOut, SourcesResponse, TimelineRequest
 from .settings import get_settings
 from .store import get_store
-from .tools import ProvisionLinks, make_tools
+from .tools import ProvisionLinks, check_applicability, compliance_timeline, make_tools
 
 app = FastAPI(title="Compliance Advisor", description=DISCLAIMER)
 
@@ -73,6 +76,7 @@ def _service() -> AnswerService:
         load_models(settings.models_file)[0].id,
         settings.top_k,
         tool_factory,
+        list_price,
     )
 
 
@@ -212,8 +216,57 @@ def ask_stream(
             yield _event(item)
 
     return StreamingResponse(
-        stream(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"}
+        stream(),
+        media_type="text/event-stream",
+        # no-transform: proxies (the Next.js server compresses responses) must not buffer the steps
+        headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"},
     )
+
+
+@app.post("/api/history/{answer_id}/obligations")
+def obligations(answer_id: str, audit: Annotated[AuditStore | None, Depends(get_audit)]) -> dict:
+    """Extracts the Obligations behind a stored answer and stores them with it."""
+    record = history_item(answer_id, audit)
+    settings = get_settings()
+    try:
+        model = chat_model(load_models(settings.models_file)[0], settings)
+        response = record["response"]
+        rows, raw = extract_obligations(
+            model, response["question"], response["passages"], response["cited"]
+        )
+    except SystemExit as e:
+        raise UpstreamError(str(e)) from None
+    except openai.APIError as e:
+        raise UpstreamError(f"the answer model did not respond: {e}") from e
+    data = [r.model_dump() for r in rows]
+    audit.save_obligations(answer_id, data)
+    cost = float(
+        ((getattr(raw, "response_metadata", None) or {}).get("token_usage") or {}).get("cost") or 0
+    )
+    return {"rows": data, "cost_usd": round(cost, 6)}
+
+
+@app.post("/api/timeline")
+def timeline(request: TimelineRequest) -> dict:
+    """Milestones of all Sources, or of those the Firm Profile makes applicable."""
+    settings = get_settings()
+    sources = load_sources(settings.sources_file)
+    applicable_titles: set[str] | None = None
+    if request.profile:
+        result = check_applicability(request.profile, ProvisionLinks(sources))
+        applicable_titles = {
+            title
+            for f in result.findings
+            if f.applies in ("yes", "later", "check")
+            for title in f.sources
+        }
+        sources = [s for s in sources if s.short_title in applicable_titles]
+    result = compliance_timeline(sources, date.today(), None, request.upcoming_only)
+    return {
+        "today": result.today,
+        "entries": [e.model_dump() for e in result.entries],
+        "filtered": request.profile is not None,
+    }
 
 
 @app.get("/api/models")

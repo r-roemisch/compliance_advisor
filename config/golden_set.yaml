@@ -1,0 +1,215 @@
+# Golden Set: test questions for the evaluation (docs/EVALUATION.md).
+#
+# Not legal advice: the Compliance Advisor gives general regulatory information only.
+#
+# Status: draft, written 2026-10-23, to be reviewed by you. For each item, check:
+#   - Is the question realistic for a compliance team at a bank or insurer?
+#   - Are the `expected` Provisions the right ones? Add other Provisions that would also be a
+#     correct answer; the lists are deliberately short and may be too narrow.
+#   - Then set `status: reviewed`, or `status: rejected` with a reason in `notes`.
+#
+# Fields
+#   id         short and stable; results refer to it
+#   question   as a Compliance Officer would ask it
+#   language   de | en
+#   regime     dora | aml | payments | insurance | banking | digital
+#   expected   Provision labels exactly as in the index ("Art. 17 DORA", "§ 10 GwG", "AT 4.4.2 MaRisk").
+#              A search counts as a hit when any of them is among the six Passages.
+#   seed       true when the question can be answered from the first six Sources, so the naive
+#              baseline index (which holds only those) can be compared on it
+#   status     draft | reviewed | rejected
+#   notes      anything worth knowing
+
+items:
+
+  # --- DORA (seed) ---
+  - id: dora-major-criteria
+    question: "When is an ICT-related incident considered a major incident under DORA?"
+    language: en
+    regime: dora
+    expected: ["Art. 8 Delegated Regulation (EU) 2024/1772", "Art. 18 DORA"]
+    seed: true
+    status: draft
+  - id: dora-client-threshold
+    question: "Ab wie vielen betroffenen Kunden ist bei einem IKT-Vorfall die Wesentlichkeitsschwelle erreicht?"
+    language: de
+    regime: dora
+    expected: ["Art. 9 Delegated Regulation (EU) 2024/1772"]
+    seed: true
+    status: draft
+    notes: "Cross-lingual: German question, English Source."
+  - id: dora-incident-process
+    question: "What must a financial entity's ICT-related incident management process include?"
+    language: en
+    regime: dora
+    expected: ["Art. 17 DORA"]
+    seed: true
+    status: draft
+  - id: dora-scope
+    question: "Which financial entities fall within the scope of DORA?"
+    language: en
+    regime: dora
+    expected: ["Art. 2 DORA"]
+    seed: true
+    status: draft
+
+  # --- Anti-money laundering (seed) ---
+  - id: gwg-general-cdd
+    question: "Welche allgemeinen Sorgfaltspflichten muss ein Verpflichteter nach dem GwG erfüllen?"
+    language: de
+    regime: aml
+    expected: ["§ 10 GwG"]
+    seed: true
+    status: draft
+  - id: gwg-cdd-credit-institution
+    question: "Welche allgemeinen Sorgfaltspflichten muss ein Kreditinstitut nach dem GwG erfüllen?"
+    language: de
+    regime: aml
+    expected: ["§ 10 GwG"]
+    seed: true
+    status: draft
+    notes: "Crowding case: 'Kreditinstitut' pulls in KWG paragraphs; the per-Source cap was added for this."
+  - id: gwg-enhanced-cdd
+    question: "Wann sind nach dem Geldwäschegesetz verstärkte Sorgfaltspflichten anzuwenden?"
+    language: de
+    regime: aml
+    expected: ["§ 15 GwG", "7 BaFin AuA GwG"]
+    seed: true
+    status: draft
+  - id: gwg-mlro
+    question: "Welche Aufgaben hat der Geldwäschebeauftragte, und wer muss einen bestellen?"
+    language: de
+    regime: aml
+    expected: ["§ 7 GwG", "3.2 BaFin AuA GwG", "3.2.5 BaFin AuA GwG"]
+    seed: true
+    status: draft
+  - id: gwg-beneficial-owner
+    question: "Was versteht das GwG unter einem wirtschaftlich Berechtigten?"
+    language: de
+    regime: aml
+    expected: ["§ 3 GwG", "5.2.1 BaFin AuA GwG", "5.2.2 BaFin AuA GwG"]
+    seed: true
+    status: draft
+  - id: amlr-application
+    question: "From when does the EU Anti-Money Laundering Regulation apply?"
+    language: en
+    regime: aml
+    expected: ["Art. 90 AMLR"]
+    seed: true
+    status: draft
+  - id: amlr-cdd-measures
+    question: "Which customer due diligence measures does the AMLR require?"
+    language: en
+    regime: aml
+    expected: ["Art. 20 AMLR"]
+    seed: true
+    status: draft
+
+  # --- Payments (seed) ---
+  - id: zag-incident-report
+    question: "Wann muss ein Zahlungsdienstleister der BaFin einen schwerwiegenden Betriebs- oder Sicherheitsvorfall melden?"
+    language: de
+    regime: payments
+    expected: ["§ 54 ZAG"]
+    seed: true
+    status: draft
+  - id: zag-licence
+    question: "Welche Erlaubnis braucht ein Unternehmen, das in Deutschland Zahlungsdienste erbringen will?"
+    language: de
+    regime: payments
+    expected: ["§ 10 ZAG"]
+    seed: true
+    status: draft
+
+  # --- Insurance ---
+  - id: sii-governance
+    question: "What must an insurer's system of governance include under Solvency II?"
+    language: en
+    regime: insurance
+    expected: ["Art. 41 Solvency II", "Art. 258 Delegated Regulation (EU) 2015/35"]
+    seed: false
+    status: draft
+  - id: vag-compliance-function
+    question: "Welche Aufgaben hat die Compliance-Funktion eines Versicherungsunternehmens?"
+    language: de
+    regime: insurance
+    expected: ["§ 29 VAG", "10.2 MaGo", "Art. 270 Delegated Regulation (EU) 2015/35", "Art. 46 Solvency II"]
+    seed: false
+    status: draft
+  - id: vag-outsourcing
+    question: "Was müssen Versicherungsunternehmen bei der Ausgliederung wichtiger Funktionen beachten?"
+    language: de
+    regime: insurance
+    expected: ["§ 32 VAG", "13.4 MaGo", "Art. 49 Solvency II", "Art. 274 Delegated Regulation (EU) 2015/35"]
+    seed: false
+    status: draft
+  - id: idd-pog
+    question: "Which product oversight and governance requirements apply to insurance products?"
+    language: en
+    regime: insurance
+    expected: ["Art. 25 IDD"]
+    seed: false
+    status: draft
+
+  # --- Banking ---
+  - id: kwg-25a
+    question: "What does § 25a KWG require from a bank's business organisation?"
+    language: en
+    regime: banking
+    expected: ["§ 25a KWG"]
+    seed: false
+    status: draft
+    notes: "Names the Provision explicitly; tests the direct lookup."
+  - id: marisk-compliance
+    question: "Welche Aufgaben hat die Compliance-Funktion eines Kreditinstituts nach den MaRisk?"
+    language: de
+    regime: banking
+    expected: ["AT 4.4.2 MaRisk"]
+    seed: false
+    status: draft
+  - id: marisk-scope
+    question: "Gilt die MaRisk für bedeutende Institute unter direkter EZB-Aufsicht?"
+    language: de
+    regime: banking
+    expected: ["AT 2.1 MaRisk"]
+    seed: false
+    status: draft
+  - id: crd-governance
+    question: "What internal governance arrangements must credit institutions have under the CRD?"
+    language: en
+    regime: banking
+    expected: ["Art. 74 CRD"]
+    seed: false
+    status: draft
+
+  # --- Digital ---
+  - id: ai-credit-scoring
+    question: "Is an AI system for credit scoring of natural persons a high-risk AI system?"
+    language: en
+    regime: digital
+    expected: ["Annex III AI Act", "Art. 6 AI Act"]
+    seed: false
+    status: draft
+  - id: ai-deployer-duties
+    question: "What must deployers of high-risk AI systems do?"
+    language: en
+    regime: digital
+    expected: ["Art. 26 AI Act"]
+    seed: false
+    status: draft
+  - id: gdpr-automated-decisions
+    question: "Wann darf eine Entscheidung ausschließlich auf einer automatisierten Verarbeitung beruhen?"
+    language: de
+    regime: digital
+    expected: ["Art. 22 GDPR"]
+    seed: false
+    status: draft
+    notes: "Cross-lingual: German question, English Source."
+  - id: dora-report-deadlines
+    question: "What are the time limits for the initial notification of a major ICT-related incident?"
+    language: en
+    regime: dora
+    expected: ["Art. 5 Delegated Regulation (EU) 2025/301", "Art. 19 DORA"]
+    seed: false
+    status: draft
+    notes: "The reporting standard is not among the first six Sources."

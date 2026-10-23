@@ -1,4 +1,4 @@
-import type { AskResponse, FirmProfile, HistoryItem, ModelOption, Preset, SourceInfo, StreamEvent } from "./types";
+import type { AskResponse, FirmProfile, HistoryItem, ModelOption, ObligationRow, Preset, SourceInfo, StreamEvent, TimelineEntry } from "./types";
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -25,7 +25,30 @@ export const loadPresets = () => getJson<{ presets: Preset[] }>("/api/profiles")
 export const loadModels = () => getJson<{ models: ModelOption[] }>("/api/models").then((d) => d.models);
 export const loadHistory = () => getJson<{ items: HistoryItem[] }>("/api/history").then((d) => d.items);
 export const loadAnswer = (id: string) =>
-  getJson<{ response: AskResponse }>(`/api/history/${id}`).then((d) => ({ ...d.response, id }));
+  getJson<{ response: AskResponse; obligations: ObligationRow[] | null }>(`/api/history/${id}`).then((d) => ({
+    ...d.response,
+    id,
+    obligations: d.obligations,
+  }));
+
+async function postJson<T>(path: string, body: unknown): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  } catch {
+    throw new ApiError(0, "unreachable");
+  }
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new ApiError(response.status, typeof data.detail === "string" ? data.detail : `HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
+export const extractObligations = (id: string) =>
+  postJson<{ rows: ObligationRow[] }>(`/api/history/${id}/obligations`, {}).then((d) => d.rows);
+export const loadTimeline = (profile: FirmProfile | null, upcomingOnly: boolean) =>
+  postJson<{ entries: TimelineEntry[] }>("/api/timeline", { profile, upcoming_only: upcomingOnly }).then((d) => d.entries);
 export const exportUrl = (id: string, format: "md" | "json") => `/api/history/${id}/export?format=${format}`;
 
 /** Asks a question and reports each step as server-sent events arrive. */

@@ -59,14 +59,25 @@ A second grilling session decided the end product and a five-day submission plan
 - Number tables no longer indexed; Delegated Regulation 2015/35 re-indexed (634 Passages; 5,596 in the per-provision collection).
 - Checked in a real browser at 1440 px, in dark mode and at 390 px (no horizontal scroll, no console errors). 37 tests pass.
 
+## Day 4 (2026-10-23): done, pending your review
+
+- Extract Obligations: button under each answer; rows from the cited Passages (Provision and link from the Passage, not the model); CSV for German Excel; stored with the answer and in its export.
+- Timeline tab: Milestones of all Sources or only those the Firm Profile makes applicable.
+- Golden Set draft: 25 questions in `config/golden_set.yaml` (13 answerable from the first six Sources).
+- Evaluation: `compliance-advisor-eval`, five retrieval set-ups, optional answer scoring; log in `evaluation/results.jsonl`, report in `docs/EVALUATION.md`.
+- Draft results: per-Provision cutting beats the naive baseline (hit@6 0.77 to 1.00 on seed questions); the named lookup helps; the per-Source cap costs hits on this set. Answers: 100 % valid citations; expected Provision cited 77 % (naive) vs 88 % (app).
+- Progress panel fixed and made more informative: steps were held back by the proxy's compression; now they arrive live, the search step names its findings, and the answer streams in.
+- 44 tests pass.
+
 ## Waiting on you
 
-- "Go" for day 4, and a look at the interface: http://localhost:3010 (containers are running).
-- Still open: should the incident classifier also get its own form?
+1. Review the Golden Set (`config/golden_set.yaml`, 25 items; instructions at the top). Then I run the final evaluation on the reviewed set.
+2. Decide on the per-Source cap: the evidence says switch it off (`MAX_PER_SOURCE=0`); the named lookup stays.
+3. Still open: a separate form for the incident classifier.
 
 ## Next session
 
-1. Day 4: Extract Obligations (table with CSV export), timeline view of all Milestones, Golden Set of about 20 questions (written after the interface, reviewed by you), retrieval evaluation with the results log (baseline first).
+1. Final evaluation on the reviewed Golden Set; apply the cap decision.
 2. Day 5: buffer, README walkthrough, demo script, screenshots.
 
 ## Agreed prompt (goes into `backend/.../prompt.py` in 1b)

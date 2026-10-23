@@ -27,6 +27,7 @@ dependencies = [
 compliance-advisor-fetch = "compliance_advisor.fetch:main"
 compliance-advisor-ingest = "compliance_advisor.ingest:main"
 compliance-advisor-api = "compliance_advisor.api:main"
+compliance-advisor-eval = "compliance_advisor.evaluation:main"
 
 [build-system]
 requires = ["uv_build>=0.12.17,<0.13.0"]

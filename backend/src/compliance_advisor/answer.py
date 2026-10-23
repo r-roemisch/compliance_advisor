@@ -49,7 +49,9 @@ def cited_numbers(answer: str, available: int) -> list[int]:
     return found
 
 
-def _usage(*replies) -> Usage:
+def _usage(*replies, prices: tuple[float, float] | None = None) -> Usage:
+    """Token counts and cost. Streamed replies carry no cost, so it is computed from OpenRouter's
+    per-token list prices (input, output); output tokens include the model's reasoning."""
     total = Usage()
     for reply in replies:
         meta = getattr(reply, "usage_metadata", None) or {}
@@ -57,6 +59,8 @@ def _usage(*replies) -> Usage:
         total.output_tokens += meta.get("output_tokens", 0)
         reported = (getattr(reply, "response_metadata", None) or {}).get("token_usage") or {}
         total.cost_usd += float(reported.get("cost") or 0.0)
+    if not total.cost_usd and prices:
+        total.cost_usd = total.input_tokens * prices[0] + total.output_tokens * prices[1]
     total.cost_usd = round(total.cost_usd, 6)
     return total
 
@@ -73,6 +77,13 @@ def split_coverage(answer: str) -> tuple[str, str]:
 
 
 Stage = Callable[[str, dict], None]
+
+
+def usage_reported(replies) -> bool:
+    return any(
+        ((getattr(r, "response_metadata", None) or {}).get("token_usage") or {}).get("cost")
+        for r in replies
+    )
 
 
 def _quiet(stage: str, data: dict) -> None:
@@ -94,6 +105,7 @@ class AnswerService:
         model_id: str,
         top_k: int,
         tools: ToolFactory | None = None,
+        prices: Callable[[str], tuple[float, float] | None] | None = None,
     ):
         """`models` maps model ids to chat models; `model_id` is the default."""
         self.retriever = retriever
@@ -101,6 +113,25 @@ class AnswerService:
         self.model_id = model_id
         self.top_k = top_k
         self.tools = tools
+        self.prices = prices or (lambda model_id: None)
+
+    @staticmethod
+    def _call(runnable, messages, on_stage: Stage):
+        """Calls the model; when it can stream, the answer text is passed on as it arrives and
+        the "writing" step is reported the moment the first words come in."""
+        if not hasattr(runnable, "stream"):
+            return runnable.invoke(messages)
+        reply = None
+        writing = False
+        for chunk in runnable.stream(messages):
+            reply = chunk if reply is None else reply + chunk
+            text = chunk.content if isinstance(chunk.content, str) else ""
+            if text:
+                if not writing:
+                    on_stage("writing", {})
+                    writing = True
+                on_stage("delta", {"text": text})
+        return reply
 
     def _tool_round(self, model, messages, profile: FirmProfile | None, on_stage: Stage):
         """One round: the model may call tools once, then answers without further tool calls.
@@ -108,9 +139,9 @@ class AnswerService:
         tools = self.tools(profile, date.today()) if self.tools else []
         on_stage("model", {})
         if not tools:
-            reply = model.invoke(messages)
+            reply = self._call(model, messages, on_stage)
             return reply, [reply], []
-        first = model.bind_tools(tools).invoke(messages)
+        first = self._call(model.bind_tools(tools), messages, on_stage)
         if not getattr(first, "tool_calls", None):
             return first, [first], []
         on_stage("tools", {"tools": [call["name"] for call in first.tool_calls[:MAX_TOOL_CALLS]]})
@@ -133,8 +164,7 @@ class AnswerService:
             follow_up.append(
                 ToolMessage(content='{"error": "too many tool calls"}', tool_call_id=call["id"])
             )
-        on_stage("writing", {})
-        final = model.bind_tools(tools, tool_choice="none").invoke(follow_up)
+        final = self._call(model.bind_tools(tools, tool_choice="none"), follow_up, on_stage)
         return final, [first, final], runs
 
     def ask(
@@ -157,6 +187,15 @@ class AnswerService:
             raise UpstreamError(f"the embedding service did not respond: {e}") from e
         except SQLAlchemyError as e:
             raise DatabaseError("the database is not reachable") from e
+        on_stage(
+            "found",
+            {
+                "count": len(passages),
+                "sources": list(
+                    dict.fromkeys(p.document.metadata["short_title"] for p in passages)
+                ),
+            },
+        )
         messages = build_messages(question, passages, profile.describe() if profile else "")
         try:
             reply, replies, runs = self._tool_round(
@@ -166,7 +205,9 @@ class AnswerService:
             raise UpstreamError(f"the answer model did not respond: {e}") from e
 
         answer, coverage = split_coverage(_text(reply))
-        usage = _usage(*replies)
+        if not usage_reported(replies):
+            log.debug("cost computed from list prices for %s", model_id)
+        usage = _usage(*replies, prices=self.prices(model_id))
         response = AskResponse(
             question=question,
             redactions=redactions,

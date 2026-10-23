@@ -4,7 +4,7 @@ import json
 from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, AIMessageChunk
 
 from compliance_advisor import api
 from compliance_advisor.answer import AnswerService, _usage, split_coverage
@@ -71,7 +71,8 @@ def test_stream_reports_each_step_then_the_result():
         "POST", "/api/ask/stream", json={"question": "Does DORA apply?"}
     ) as r:
         events = [json.loads(line[6:]) for line in r.iter_lines() if line.startswith("data: ")]
-    assert [e["stage"] for e in events] == ["search", "model", "done"]
+    assert [e["stage"] for e in events] == ["search", "found", "model", "done"]
+    assert events[1]["count"] == 1 and events[1]["sources"] == ["DORA"]
     result = AskResponse.model_validate(events[-1]["result"])
     assert result.coverage == "full" and result.cited == [1]
 
@@ -92,3 +93,28 @@ def test_model_list_offers_an_eu_hosted_option():
     assert models[0]["id"] == "openai/gpt-6-luna"
     assert any(m["eu_hosted"] for m in models)
     assert all("provider_only" not in m for m in models)
+
+
+class StreamingModel:
+    def stream(self, messages):
+        for piece in ["DORA ", "applies [1].", "\nCoverage: full"]:
+            yield AIMessageChunk(content=piece)
+
+
+def test_streamed_answer_reports_writing_and_text_as_it_arrives():
+    stages = []
+    response = AnswerService(OnePassage(), StreamingModel(), "m", top_k=6).ask(
+        "Does DORA apply?", on_stage=lambda stage, data: stages.append((stage, data.get("text")))
+    )
+    names = [s for s, _ in stages]
+    assert names[:3] == ["search", "found", "model"] and names[3] == "writing"
+    assert "".join(t for s, t in stages if s == "delta") == "DORA applies [1].\nCoverage: full"
+    assert response.answer == "DORA applies [1]." and response.coverage == "full"
+
+
+def test_cost_is_computed_from_list_prices_when_not_reported():
+    a = AIMessage(
+        content="",
+        usage_metadata={"input_tokens": 1000, "output_tokens": 100, "total_tokens": 1100},
+    )
+    assert _usage(a, prices=(1e-7, 5e-7)).cost_usd == 0.00015

@@ -6,7 +6,23 @@ import { TOOL_NAMES, type Strings } from "@/lib/i18n";
 import type { Lang, Stage } from "@/lib/types";
 
 /** The real steps the backend reports while it works; tools appear only when called. */
-export function Progress({ t, lang, stage, tools }: { t: Strings; lang: Lang; stage: Stage; tools: string[] }) {
+export function Progress({
+  t,
+  lang,
+  stage,
+  tools,
+  found,
+  profileSet,
+  draft,
+}: {
+  t: Strings;
+  lang: Lang;
+  stage: Stage;
+  tools: string[];
+  found: { count: number; sources: string[] } | null;
+  profileSet: boolean;
+  draft: string;
+}) {
   const [seconds, setSeconds] = useState(0);
   useEffect(() => {
     const started = Date.now();
@@ -41,11 +57,25 @@ export function Progress({ t, lang, stage, tools }: { t: Strings; lang: Lang; st
               {step.id === "tools" && tools.length > 0 && (
                 <span className="text-ink-2">({tools.map((n) => TOOL_NAMES[n]?.[lang] ?? n).join(", ")})</span>
               )}
+              {step.id === "search" && found && (
+                <span className="text-ink-2">: {t.found(found.count, found.sources.join(", "))}</span>
+              )}
+              {step.id === "model" && profileSet && state !== "todo" && (
+                <span className="text-ink-2">: {t.profileUsed}</span>
+              )}
             </li>
           );
         })}
       </ol>
       <p className="mt-2 text-xs text-ink-3 tabular-nums">{t.elapsed(seconds)}</p>
+      {draft && (
+        <div className="answer mt-3 border-t border-line pt-3 text-ink-2" aria-live="off">
+          <p className="whitespace-pre-wrap">
+            {draft.replace(/\s*[*_]*\s*Coverage:.*$/i, "")}
+            <span aria-hidden className="ml-0.5 inline-block h-4 w-[2px] translate-y-[3px] animate-pulse bg-accent" />
+          </p>
+        </div>
+      )}
     </div>
   );
 }
