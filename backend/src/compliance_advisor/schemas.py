@@ -67,6 +67,21 @@ class AskResponse(BaseModel):
     disclaimer: str
 
 
+class RegisterRequest(BaseModel):
+    email: str = Field(max_length=320)
+    password: str = Field(max_length=200)
+    name: str = Field(default="", max_length=200)
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(max_length=320)
+    password: str = Field(max_length=200)
+
+
+class ProfileUpdate(BaseModel):
+    profile: FirmProfile | None = None
+
+
 class TimelineRequest(BaseModel):
     profile: FirmProfile | None = None
     upcoming_only: bool = False

@@ -64,7 +64,23 @@ export type SourceInfo = {
   passages: number;
 };
 
-export type HistoryItem = { id: string; created_at: string; question: string; model: string };
+export type HistoryItem = { id: string; created_at: string; question: string; model: string; has_obligations?: boolean };
+
+export type User = { id: string; email: string; name: string; profile: FirmProfile | null };
+
+export type DashboardData = {
+  user: User;
+  stats: {
+    questions: number;
+    cost_usd: number;
+    obligations: number;
+    answers_with_obligations: number;
+    first_question_at: string | null;
+    last_question_at: string | null;
+  };
+  upcoming: TimelineEntry[];
+  recent: HistoryItem[];
+};
 
 export type Stage = "search" | "model" | "tools" | "writing";
 export type StreamEvent =

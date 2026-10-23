@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AnswerView } from "./AnswerView";
+import { AuthDialog } from "./AuthDialog";
+import { Dashboard } from "./Dashboard";
 import { Composer } from "./Composer";
 import { Header } from "./Header";
 import { Obligations } from "./Obligations";
@@ -11,14 +13,28 @@ import { ProfileDialog } from "./ProfileDialog";
 import { Progress } from "./Progress";
 import { Sidebar } from "./Sidebar";
 import { ToolCards } from "./ToolCards";
-import { ApiError, askStream, loadAnswer, loadHistory, loadModels, loadPresets, loadSources } from "@/lib/api";
+import {
+  ApiError,
+  askStream,
+  loadAnswer,
+  loadHistory,
+  loadMe,
+  loadModels,
+  loadPresets,
+  loadSources,
+  logout,
+  saveProfile,
+} from "@/lib/api";
 import { EXAMPLES, STRINGS } from "@/lib/i18n";
 import { readStored, writeStored } from "@/lib/storage";
-import type { AskResponse, FirmProfile, HistoryItem, Lang, ModelOption, Preset, SourceInfo, Stage } from "@/lib/types";
+import type { AskResponse, FirmProfile, HistoryItem, Lang, ModelOption, Preset, SourceInfo, Stage, User } from "@/lib/types";
 
 type Theme = "system" | "light" | "dark";
+export type View = "research" | "dashboard";
 
-export default function App() {
+const PATHS: Record<View, string> = { research: "/", dashboard: "/dashboard" };
+
+export default function App({ initialView = "research" }: { initialView?: View }) {
   // Rendered only in the browser (see app/page.tsx), so stored preferences can seed the state.
   const [lang, setLang] = useState<Lang>(() => readStored<Lang>("lang", "de"));
   const [theme, setTheme] = useState<Theme>(() => readStored<Theme>("theme", "system"));
@@ -38,6 +54,10 @@ export default function App() {
   const [active, setActive] = useState<number | null>(null);
   const [hover, setHover] = useState<number | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [view, setView] = useState<View>(initialView);
+  const [user, setUser] = useState<User | null>(null);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const abort = useRef<AbortController | null>(null);
   const t = STRINGS[lang];
 
@@ -55,7 +75,47 @@ export default function App() {
       .then(setSources)
       .catch((e: ApiError) => setError(e.status === 0 ? STRINGS.de.errorUnreachable : e.message));
     loadHistory().then(setHistory).catch(() => undefined);
+    loadMe()
+      .then((me) => me && signedIn(me))
+      .catch(() => undefined);
+    // Back and forward buttons switch between Research and Dashboard.
+    const onPop = () => setView(window.location.pathname.startsWith("/dashboard") ? "dashboard" : "research");
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
   }, []);
+
+  const go = (next: View) => {
+    setView(next);
+    if (window.location.pathname !== PATHS[next]) window.history.pushState(null, "", PATHS[next]);
+  };
+
+  /** After login: the account's Firm Profile wins; a guest profile is kept if the account has none. */
+  function signedIn(me: User) {
+    setUser(me);
+    setAuthOpen(false);
+    if (me.profile) {
+      setProfile(me.profile);
+    } else {
+      const local = readStored<FirmProfile | null>("profile", null);
+      if (local) saveProfile(local).then(setUser).catch(() => undefined);
+    }
+    loadHistory().then(setHistory).catch(() => undefined);
+    setResult(null);
+    setRefreshKey((k) => k + 1);
+  }
+
+  const signOut = async () => {
+    await logout().catch(() => undefined);
+    signedOut();
+  };
+
+  function signedOut() {
+    setUser(null);
+    setResult(null);
+    setProfile(readStored<FirmProfile | null>("profile", null));
+    loadHistory().then(setHistory).catch(() => undefined);
+    go("research");
+  }
 
   useEffect(() => {
     document.documentElement.lang = lang;
@@ -75,8 +135,17 @@ export default function App() {
 
   const applyProfile = (p: FirmProfile | null) => {
     setProfile(p);
-    writeStored("profile", p);
     setProfileOpen(false);
+    if (user) {
+      saveProfile(p)
+        .then((me) => {
+          setUser(me);
+          setRefreshKey((k) => k + 1);
+        })
+        .catch(() => undefined);
+    } else {
+      writeStored("profile", p);
+    }
   };
 
   const submit = useCallback(async () => {
@@ -98,6 +167,7 @@ export default function App() {
             setResult(event.result);
             setStage(null);
             loadHistory().then(setHistory).catch(() => undefined);
+            setRefreshKey((k) => k + 1);
           } else if (event.stage === "found") {
             setFound({ count: event.count, sources: event.sources });
           } else if (event.stage === "delta") {
@@ -170,7 +240,30 @@ export default function App() {
         models={models}
         model={model}
         onModel={chooseModel}
+        view={view}
+        onView={go}
+        user={user}
+        onSignIn={() => setAuthOpen(true)}
+        onSignOut={signOut}
       />
+
+      {view === "dashboard" ? (
+        <main id="main" className="mx-auto w-full max-w-[1500px] flex-1 px-4 py-5 lg:px-6">
+          <Dashboard
+            t={t}
+            lang={lang}
+            user={user}
+            refreshKey={refreshKey}
+            onSignIn={() => setAuthOpen(true)}
+            onEditProfile={() => setProfileOpen(true)}
+            onOpenAnswer={(id) => {
+              go("research");
+              openStored(id);
+            }}
+            onSignedOut={signedOut}
+          />
+        </main>
+      ) : (
 
       <div className="mx-auto grid w-full max-w-[1500px] flex-1 gap-6 px-4 py-5 lg:grid-cols-[250px_minmax(0,1fr)] lg:px-6">
         <Sidebar
@@ -242,12 +335,15 @@ export default function App() {
           </div>
         </main>
       </div>
+      )}
 
       <footer className="border-t border-line bg-panel">
         <p className="mx-auto max-w-[1500px] px-4 py-3 text-xs text-ink-2 lg:px-6">
           <strong className="font-semibold text-ink">{t.noticeShort}.</strong> {t.notice}
         </p>
       </footer>
+
+      <AuthDialog open={authOpen} t={t} onDone={signedIn} onClose={() => setAuthOpen(false)} />
 
       <ProfileDialog
         open={profileOpen}

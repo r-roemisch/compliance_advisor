@@ -123,6 +123,13 @@ Trust must-haves: links to the exact provision, legal status and "as of" dates, 
 - Done: per-Source cap switched off (`MAX_PER_SOURCE=0`) after the evaluation; fresh-install test from a clean clone into an empty database following the README only (fetch skipped existing files, ingest 5,596 Passages in 2.5 minutes, first answer stored); README rewritten as one path for reviewers with a requirements table; `docs/DEMO.md`; nine screenshots in `docs/screenshots/`; progress panel polished (formatted live text).
 - Still open: your Golden Set review and the final evaluation on the reviewed set; the incident-classifier form; pushing the repository to a host if the submission needs a link.
 
+## Accounts and dashboard (added 2026-10-23, after day 5)
+
+- Optional accounts with email and password (scrypt hashes, hashed session tokens in an httpOnly cookie); answers private to their account; guest mode unchanged (ADR 0005).
+- Firm Profile saved to the account; a guest profile is taken over on first login if the account has none.
+- Dashboard at `/dashboard`: key figures, Firm Profile, upcoming dates for it, searchable archive of all own questions; account deletion removes the answers too.
+- Not yet: email verification, password reset, login through an identity provider such as Microsoft Entra ID.
+
 ## After the submission
 
 - Stored obligation list across sessions, then team features (shared lists, assignment, second review).

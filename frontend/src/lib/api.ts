@@ -1,4 +1,4 @@
-import type { AskResponse, FirmProfile, HistoryItem, ModelOption, ObligationRow, Preset, SourceInfo, StreamEvent, TimelineEntry } from "./types";
+import type { AskResponse, DashboardData, FirmProfile, HistoryItem, ModelOption, ObligationRow, Preset, SourceInfo, StreamEvent, TimelineEntry, User } from "./types";
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -23,7 +23,8 @@ async function getJson<T>(path: string): Promise<T> {
 export const loadSources = () => getJson<{ sources: SourceInfo[] }>("/api/sources").then((d) => d.sources);
 export const loadPresets = () => getJson<{ presets: Preset[] }>("/api/profiles").then((d) => d.presets);
 export const loadModels = () => getJson<{ models: ModelOption[] }>("/api/models").then((d) => d.models);
-export const loadHistory = () => getJson<{ items: HistoryItem[] }>("/api/history").then((d) => d.items);
+export const loadHistory = (search = "") =>
+  getJson<{ items: HistoryItem[] }>(`/api/history?limit=200&q=${encodeURIComponent(search)}`).then((d) => d.items);
 export const loadAnswer = (id: string) =>
   getJson<{ response: AskResponse; obligations: ObligationRow[] | null }>(`/api/history/${id}`).then((d) => ({
     ...d.response,
@@ -89,3 +90,33 @@ export async function askStream(
     }
   }
 }
+
+async function send<T>(method: string, path: string, body?: unknown): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      method,
+      headers: body === undefined ? undefined : { "content-type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    throw new ApiError(0, "unreachable");
+  }
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new ApiError(response.status, typeof data.detail === "string" ? data.detail : `HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
+// Accounts. The session lives in an httpOnly cookie that the browser sends by itself.
+export const loadMe = () => getJson<{ user: User | null }>("/api/auth/me").then((d) => d.user);
+export const register = (email: string, password: string, name: string) =>
+  send<{ user: User }>("POST", "/api/auth/register", { email, password, name }).then((d) => d.user);
+export const login = (email: string, password: string) =>
+  send<{ user: User }>("POST", "/api/auth/login", { email, password }).then((d) => d.user);
+export const logout = () => send<{ user: null }>("POST", "/api/auth/logout");
+export const saveProfile = (profile: FirmProfile | null) =>
+  send<{ user: User }>("PUT", "/api/me/profile", { profile }).then((d) => d.user);
+export const loadDashboard = () => getJson<DashboardData>("/api/me/dashboard");
+export const deleteAccount = () => send<{ deleted: boolean; answers_removed: number }>("DELETE", "/api/me");

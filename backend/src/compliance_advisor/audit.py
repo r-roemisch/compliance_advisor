@@ -5,7 +5,7 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
-from sqlalchemy import Column, DateTime, MetaData, String, Table, Text, select, text, update
+from sqlalchemy import Column, DateTime, MetaData, String, Table, Text, func, select, text, update
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.engine import Engine
 
@@ -23,6 +23,7 @@ answers = Table(
     Column("response", JSONB, nullable=False),  # the full response as the interface saw it
     Column("source_versions", JSONB, nullable=False),
     Column("obligations", JSONB),  # rows from "Extract Obligations", if run
+    Column("user_id", String(36), index=True),  # the account that asked; empty for guests
 )
 
 
@@ -47,8 +48,16 @@ class AuditStore:
             connection.execute(
                 text("alter table answers add column if not exists obligations jsonb")
             )
+            connection.execute(
+                text("alter table answers add column if not exists user_id varchar(36)")
+            )
+            connection.execute(
+                text("create index if not exists ix_answers_user_id on answers (user_id)")
+            )
 
-    def save(self, response: AskResponse, profile: dict | None) -> AskResponse:
+    def save(
+        self, response: AskResponse, profile: dict | None, user_id: str | None = None
+    ) -> AskResponse:
         response = response.model_copy(
             update={"id": str(uuid.uuid4()), "created_at": datetime.now(UTC)}
         )
@@ -63,6 +72,7 @@ class AuditStore:
                     model=response.model,
                     response=json.loads(response.model_dump_json()),
                     source_versions=versions,
+                    user_id=user_id,
                 )
             )
         return response
@@ -73,14 +83,49 @@ class AuditStore:
                 update(answers).where(answers.c.id == answer_id).values(obligations=rows)
             )
 
-    def recent(self, limit: int = 50) -> list[dict]:
-        query = (
-            select(answers.c.id, answers.c.created_at, answers.c.question, answers.c.model)
-            .order_by(answers.c.created_at.desc())
-            .limit(limit)
-        )
+    @staticmethod
+    def _owned_by(user_id: str | None):
+        """Answers of this account, or the shared guest answers when nobody is logged in."""
+        return answers.c.user_id == user_id if user_id else answers.c.user_id.is_(None)
+
+    def recent(self, user_id: str | None = None, search: str = "", limit: int = 50) -> list[dict]:
+        query = select(
+            answers.c.id,
+            answers.c.created_at,
+            answers.c.question,
+            answers.c.model,
+            (answers.c.obligations.isnot(None)).label("has_obligations"),
+        ).where(self._owned_by(user_id))
+        if search.strip():
+            query = query.where(answers.c.question.ilike(f"%{search.strip()}%"))
+        query = query.order_by(answers.c.created_at.desc()).limit(limit)
         with self.engine.connect() as connection:
             return [dict(row._mapping) for row in connection.execute(query)]
+
+    def stats(self, user_id: str) -> dict:
+        """Key figures for the dashboard."""
+        owned = self._owned_by(user_id)
+        cost = answers.c.response["usage"]["cost_usd"].as_float()
+        with self.engine.connect() as connection:
+            count, total_cost, first, last = connection.execute(
+                select(
+                    func.count(),
+                    func.coalesce(func.sum(cost), 0.0),
+                    func.min(answers.c.created_at),
+                    func.max(answers.c.created_at),
+                ).where(owned)
+            ).one()
+            rows = connection.execute(
+                select(answers.c.obligations).where(owned, answers.c.obligations.isnot(None))
+            ).all()
+        return {
+            "questions": count,
+            "cost_usd": round(float(total_cost), 4),
+            "obligations": sum(len(r[0] or []) for r in rows),
+            "answers_with_obligations": len(rows),
+            "first_question_at": first,
+            "last_question_at": last,
+        }
 
     def get(self, answer_id: str) -> dict | None:
         with self.engine.connect() as connection:

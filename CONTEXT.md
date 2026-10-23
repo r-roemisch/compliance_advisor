@@ -24,6 +24,10 @@ _Avoid_: Compliance department, compliance team
 The stated facts about a Firm that decide which rules apply to it: its type (for example significant bank, primary insurer, reinsurer), its size class and its activities.
 _Avoid_: Settings, company profile, persona
 
+**Account**:
+A Compliance Officer's login, holding their Firm Profile and their own answers. Optional: without one, the Compliance Officer works as a guest.
+_Avoid_: User (in domain talk), profile (when the Firm Profile is meant)
+
 **Customer**:
 A customer of the Firm, for example the subject of a know-your-customer check. Never the person using the app.
 _Avoid_: Client, end user

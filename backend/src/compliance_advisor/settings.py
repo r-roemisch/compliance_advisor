@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     provision_max_chars: int = 2500  # longer Provisions are split into parts
     provision_overlap: int = 200
     api_host: str = "127.0.0.1"
+    cookie_secure: bool = False  # set true when served over HTTPS
     api_port: int = 8010
 
     config_dir: Path = PROJECT_ROOT / "config"

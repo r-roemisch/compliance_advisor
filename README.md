@@ -19,6 +19,7 @@ Built as a Turing College bootcamp project. German interface by default, English
 - **Timeline** of all dated milestones, or only those that apply to the Firm Profile.
 - **Audit trail**: every answer is stored with the exact source versions it used and can be exported as Markdown, JSON or PDF.
 - **Honest progress**: the steps appear as they happen, the search step names what it found, and the answer appears while it is written.
+- **Accounts and dashboard** (optional): sign up with email and password; your questions, answers and Firm Profile stay private to you. The dashboard shows your key figures, your Firm Profile, the upcoming dates for it, and a searchable archive of all your questions. Deleting the account deletes its answers.
 - **Model choice** including an EU-hosted model (Mistral Large 4 on Mistral AI's own servers), with tokens and cost shown for every answer.
 
 | Answer being written | Rule check | Obligations |
@@ -115,7 +116,8 @@ Plain code, not model output: each check applies rules taken from the sources' o
 - **"Not covered" instead of guessing.** The answer says which part the sources do not cover, and the page shows it above the answer.
 - **No compliance verdicts.** The app explains what rules require; it never says whether a specific firm is compliant ([ADR 0003](docs/adr/0003-regulatory-information-not-legal-advice.md)).
 - **What leaves the app.** The question, the retrieved passages and the Firm Profile go to the Answer Model through OpenRouter. The pre-check removes IBANs, email addresses and phone numbers first; names are not detected. An EU-hosted model can be chosen. The browser itself contacts no third party.
-- **Audit trail** of every answer with its source versions. There are no user accounts, so everyone using one installation sees the same history.
+- **Audit trail** of every answer with its source versions. With an account, answers are private to it; guests share one guest history ([ADR 0005](docs/adr/0005-optional-accounts-private-answers.md)).
+- **Accounts store** email address, name, Firm Profile and answers. Passwords are kept only as salted scrypt hashes and sessions as hashes in an httpOnly cookie. There is no email verification or password reset yet.
 
 ## Evaluation
 
@@ -148,7 +150,7 @@ docker compose up -d postgres                          # database only
 cd backend && uv sync
 uv run compliance-advisor-ingest --dry-run             # load and cut only; no key, no database
 uv run compliance-advisor-api                          # API on :8010
-uv run pytest                                          # 44 tests, no network, no database
+uv run pytest                                          # 50 tests, no network, no database
 cd ../frontend && npm install && npm run dev           # page on :3010, /api forwarded to :8010
 ```
 
@@ -158,10 +160,12 @@ cd ../frontend && npm install && npm run dev           # page on :3010, /api for
 | `POST /api/ask/stream` | The same as server-sent events: one per step, the answer text as it is written, then the result |
 | `GET /api/sources` | Sources with legal status, version, milestones, download date and passage count |
 | `GET /api/profiles`, `GET /api/models` | Firm Profile presets; Answer Models from `config/models.yaml` |
-| `GET /api/history`, `GET /api/history/{id}` | Stored answers |
+| `GET /api/history?q=`, `GET /api/history/{id}` | Your stored answers (or the guest answers), with a search |
 | `GET /api/history/{id}/export?format=md\|json` | One stored answer as Markdown or JSON, with source versions |
 | `POST /api/history/{id}/obligations` | Extracts the obligations behind a stored answer and stores them |
 | `POST /api/timeline` | Milestones, optionally only for a Firm Profile and only upcoming ones |
+| `POST /api/auth/register`, `/login`, `/logout`; `GET /api/auth/me` | Accounts; the session is an httpOnly cookie |
+| `PUT /api/me/profile`, `GET /api/me/dashboard`, `DELETE /api/me` | Save the Firm Profile, dashboard data, delete the account with its answers |
 | `GET /api/health` | Backend and database status |
 
 Errors come back as `{"detail": "..."}`: 422 for invalid input, 502 when OpenRouter does not respond, 503 when the database is not reachable.
@@ -186,12 +190,12 @@ Errors come back as `{"detail": "..."}`: 422 for invalid input, 502 when OpenRou
 | Token usage and costs | yes, per answer |
 | Visualisation of tool results | yes, one card layout per rule check |
 | Prompt-injection protection | partly: passages and question are declared data in the prompt; no separate filter |
-| Personalisation | partly: Firm Profile per browser; no user accounts |
+| Authentication and personalisation | yes: optional accounts (email and password), Firm Profile saved to the account, dashboard, private searchable archive |
 | Logging | partly: one log line per question and the audit trail; no monitoring |
 | Multi-language support | yes: German and English interface; answers in the question's language; sources in both languages |
 | A/B testing of RAG strategies | yes, offline: five retrieval set-ups compared on the Golden Set |
 | Evaluation of the RAG system | yes: own retrieval and answer metrics, logged per run |
-| Not done | hybrid search, automated knowledge-base updates, rate limiting, MCP server, analytics dashboard, authentication |
+| Not done | hybrid search, automated knowledge-base updates, rate limiting, MCP server, analytics dashboard |
 
 ## Documentation
 

@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
+from .accounts import COOKIE, SESSION_DAYS, AccountError, AccountStore, public
 from .answer import AnswerService, DatabaseError, UpstreamError
 from .audit import AuditStore, to_markdown
 from .embeddings import get_embeddings
@@ -25,7 +26,16 @@ from .profile import PRESETS, FirmProfile
 from .prompt import DISCLAIMER
 from .registry import load_sources
 from .retriever import Retriever
-from .schemas import AskRequest, AskResponse, SourceOut, SourcesResponse, TimelineRequest
+from .schemas import (
+    AskRequest,
+    AskResponse,
+    LoginRequest,
+    ProfileUpdate,
+    RegisterRequest,
+    SourceOut,
+    SourcesResponse,
+    TimelineRequest,
+)
 from .settings import get_settings
 from .store import get_store
 from .tools import ProvisionLinks, check_applicability, compliance_timeline, make_tools
@@ -92,6 +102,32 @@ def get_audit() -> AuditStore | None:
         return None  # answers still work; they are just not stored
 
 
+@lru_cache
+def _accounts() -> AccountStore:
+    return AccountStore(_engine())
+
+
+def get_accounts() -> AccountStore:
+    try:
+        return _accounts()
+    except SQLAlchemyError as e:
+        raise DatabaseError("the database is not reachable") from e
+
+
+def current_user(request: Request) -> dict | None:
+    """The logged-in account, from the session cookie; None for guests."""
+    token = request.cookies.get(COOKIE)
+    if not token:
+        return None
+    try:
+        return get_accounts().user_for(token)
+    except (DatabaseError, SQLAlchemyError):
+        return None
+
+
+User = Annotated[dict | None, Depends(current_user)]
+
+
 def get_service() -> AnswerService:
     try:
         return _service()  # built on first use; not cached while the database is down
@@ -153,11 +189,17 @@ async def database_down(request: Request, exc: DatabaseError) -> JSONResponse:
 log = logging.getLogger("compliance_advisor.api")
 
 
-def _store(audit: AuditStore | None, response: AskResponse, request: AskRequest) -> AskResponse:
+def _store(
+    audit: AuditStore | None, response: AskResponse, request: AskRequest, user: dict | None
+) -> AskResponse:
     if audit is None:
         return response
     try:
-        return audit.save(response, request.profile.model_dump() if request.profile else None)
+        return audit.save(
+            response,
+            request.profile.model_dump() if request.profile else None,
+            user["id"] if user else None,
+        )
     except SQLAlchemyError as e:
         log.warning("answer not stored in the audit trail: %s", e)
         return response
@@ -168,9 +210,10 @@ def ask(
     request: AskRequest,
     service: Annotated[AnswerService, Depends(get_service)],
     audit: Annotated[AuditStore | None, Depends(get_audit)],
+    user: User,
 ) -> AskResponse:
     response = service.ask(request.question, request.top_k, request.profile, request.model)
-    return _store(audit, response, request)
+    return _store(audit, response, request, user)
 
 
 def _event(data: dict) -> str:
@@ -182,6 +225,7 @@ def ask_stream(
     request: AskRequest,
     service: Annotated[AnswerService, Depends(get_service)],
     audit: Annotated[AuditStore | None, Depends(get_audit)],
+    user: User,
 ) -> StreamingResponse:
     """Server-sent events: one per step (search, model, tools, writing), then the result."""
     events: queue.Queue = queue.Queue()
@@ -195,7 +239,7 @@ def ask_stream(
                 request.model,
                 on_stage=lambda stage, data: events.put({"stage": stage, **data}),
             )
-            response = _store(audit, response, request)
+            response = _store(audit, response, request, user)
             events.put({"stage": "done", "result": json.loads(response.model_dump_json())})
         except UpstreamError as e:
             events.put({"stage": "error", "status": 502, "detail": str(e).capitalize()})
@@ -224,9 +268,11 @@ def ask_stream(
 
 
 @app.post("/api/history/{answer_id}/obligations")
-def obligations(answer_id: str, audit: Annotated[AuditStore | None, Depends(get_audit)]) -> dict:
+def obligations(
+    answer_id: str, audit: Annotated[AuditStore | None, Depends(get_audit)], user: User
+) -> dict:
     """Extracts the Obligations behind a stored answer and stores them with it."""
-    record = history_item(answer_id, audit)
+    record = history_item(answer_id, audit, user)
     settings = get_settings()
     try:
         model = chat_model(load_models(settings.models_file)[0], settings)
@@ -280,28 +326,40 @@ def models() -> dict:
 
 
 @app.get("/api/history")
-def history(audit: Annotated[AuditStore | None, Depends(get_audit)], limit: int = 50) -> dict:
+def history(
+    audit: Annotated[AuditStore | None, Depends(get_audit)],
+    user: User,
+    q: str = "",
+    limit: int = 50,
+) -> dict:
+    """Your own answers when logged in, the shared guest answers otherwise; `q` searches questions."""
     if audit is None:
         raise DatabaseError("the database is not reachable")
-    return {"items": audit.recent(min(max(limit, 1), 200))}
+    return {"items": audit.recent(user["id"] if user else None, q[:200], min(max(limit, 1), 200))}
 
 
 @app.get("/api/history/{answer_id}")
-def history_item(answer_id: str, audit: Annotated[AuditStore | None, Depends(get_audit)]) -> dict:
+def history_item(
+    answer_id: str, audit: Annotated[AuditStore | None, Depends(get_audit)], user: User
+) -> dict:
     if audit is None:
         raise DatabaseError("the database is not reachable")
     record = audit.get(answer_id)
-    if record is None:
+    owner = user["id"] if user else None
+    if record is None or record.get("user_id") != owner:  # other people's answers stay invisible
         raise HTTPException(status_code=404, detail="No stored answer with this id")
     return record
 
 
 @app.get("/api/history/{answer_id}/export")
 def export(
-    answer_id: str, audit: Annotated[AuditStore | None, Depends(get_audit)], format: str = "md"
+    answer_id: str,
+    audit: Annotated[AuditStore | None, Depends(get_audit)],
+    user: User,
+    format: str = "md",
 ) -> Response:
     """The stored answer as Markdown or JSON, with Passages and Source versions."""
-    record = history_item(answer_id, audit)
+    record = history_item(answer_id, audit, user)
     name = f"compliance-advisor-{record['created_at']:%Y%m%d-%H%M%S}"
     if format == "json":
         body = json.dumps(record, default=str, ensure_ascii=False, indent=2)
@@ -315,6 +373,91 @@ def export(
         media_type=media,
         headers={"Content-Disposition": f'attachment; filename="{name}.{ext}"'},
     )
+
+
+# --- Accounts -------------------------------------------------------------------------------
+
+
+def _login(response: Response, accounts: AccountStore, user: dict) -> dict:
+    token = accounts.start_session(user["id"])
+    response.set_cookie(
+        COOKIE,
+        token,
+        max_age=SESSION_DAYS * 24 * 3600,
+        httponly=True,  # not readable by page scripts
+        samesite="lax",
+        secure=get_settings().cookie_secure,
+        path="/",
+    )
+    return {"user": public(user)}
+
+
+@app.post("/api/auth/register")
+def register(body: RegisterRequest, response: Response) -> dict:
+    accounts = get_accounts()
+    user = accounts.register(body.email, body.password, body.name)
+    return _login(response, accounts, user)
+
+
+@app.post("/api/auth/login")
+def login(body: LoginRequest, response: Response) -> dict:
+    accounts = get_accounts()
+    try:
+        user = accounts.authenticate(body.email, body.password)
+    except AccountError as e:
+        raise HTTPException(status_code=401, detail=str(e)) from None
+    return _login(response, accounts, user)
+
+
+@app.post("/api/auth/logout")
+def logout(request: Request, response: Response) -> dict:
+    get_accounts().end_session(request.cookies.get(COOKIE))
+    response.delete_cookie(COOKIE, path="/")
+    return {"user": None}
+
+
+@app.get("/api/auth/me")
+def me(user: User) -> dict:
+    return {"user": public(user) if user else None}
+
+
+def _require(user: dict | None) -> dict:
+    if user is None:
+        raise HTTPException(status_code=401, detail="Please log in first")
+    return user
+
+
+@app.put("/api/me/profile")
+def save_profile(body: ProfileUpdate, user: User) -> dict:
+    user = _require(user)
+    profile = body.profile.model_dump() if body.profile else None
+    get_accounts().save_profile(user["id"], profile)
+    return {"user": public({**user, "profile": profile})}
+
+
+@app.get("/api/me/dashboard")
+def dashboard(user: User, audit: Annotated[AuditStore | None, Depends(get_audit)]) -> dict:
+    """Key figures, upcoming Milestones for the saved Firm Profile, and the latest questions."""
+    user = _require(user)
+    if audit is None:
+        raise DatabaseError("the database is not reachable")
+    profile = FirmProfile(**user["profile"]) if user["profile"] else None
+    upcoming = timeline(TimelineRequest(profile=profile, upcoming_only=True))["entries"][:6]
+    return {
+        "user": public(user),
+        "stats": audit.stats(user["id"]),
+        "upcoming": upcoming,
+        "recent": audit.recent(user["id"], "", 5),
+    }
+
+
+@app.delete("/api/me")
+def delete_account(request: Request, response: Response, user: User) -> dict:
+    """Deletes the account and every question it asked. This cannot be undone."""
+    user = _require(user)
+    removed = get_accounts().delete(user["id"])
+    response.delete_cookie(COOKIE, path="/")
+    return {"deleted": True, "answers_removed": removed}
 
 
 @app.get("/api/profiles")
