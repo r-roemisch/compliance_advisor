@@ -40,20 +40,18 @@ export function AnswerView(props: {
   const cost = result.usage.cost_usd > 0 ? t.cost(result.usage.cost_usd < 0.01 ? result.usage.cost_usd.toFixed(4) : result.usage.cost_usd.toFixed(3)) : null;
 
   return (
-    <section aria-labelledby="answer-title" className="rounded border border-line bg-panel">
+    <section aria-labelledby="answer-title" className="rounded-xl border border-line bg-panel">
       <div className="px-5 pb-5 pt-4">
-        <p className="mb-3 text-sm text-ink-2">{result.question}</p>
+        <p className="mb-4 border-b border-line pb-3 text-sm text-ink-2">{result.question}</p>
         {result.redactions.length > 0 && (
-          <p role="note" className="mb-3 rounded bg-panel-2 px-3 py-2 text-sm text-ink-2">
+          <p role="note" className="mb-3 rounded-lg bg-panel-2 px-3 py-2 text-sm text-ink-2">
             {t.redacted(kinds)}
           </p>
         )}
         {(result.coverage === "none" || result.coverage === "partial") && (
           <p
             role="note"
-            className={`mb-4 border-l-[3px] px-3 py-2 text-sm font-medium ${
-              result.coverage === "none" ? "border-amber bg-amber-soft text-amber" : "border-amber/60 bg-panel-2 text-ink"
-            }`}
+            className={`mb-4 rounded-lg bg-amber-soft px-3 py-2 text-sm font-medium ${result.coverage === "none" ? "text-amber" : "text-ink"}`}
           >
             {result.coverage === "none" ? t.coverageNone : t.coveragePartial}
           </p>
@@ -84,7 +82,7 @@ export function AnswerView(props: {
                     onFocus={() => props.onHover(n)}
                     onBlur={() => props.onHover(null)}
                     aria-label={`${t.passages} ${n}`}
-                    className={`mx-[1px] inline-flex h-[1.25rem] min-w-[1.25rem] translate-y-[-1px] items-center justify-center rounded-sm border px-1 align-middle text-[11px] font-semibold tabular-nums ${
+                    className={`mx-[1px] inline-flex h-[1.25rem] min-w-[1.25rem] translate-y-[-1px] items-center justify-center rounded-md border px-1 align-middle text-[11px] font-semibold tabular-nums ${
                       props.active === n ? "border-accent bg-accent text-accent-ink" : "border-accent/50 text-accent hover:bg-accent-soft"
                     }`}
                   >
@@ -104,15 +102,15 @@ export function AnswerView(props: {
         <span className="tabular-nums">{t.tokens(result.usage.input_tokens, result.usage.output_tokens)}</span>
         {cost && <span className="tabular-nums">{cost}</span>}
         {result.id && (
-          <span className="no-print ml-auto flex items-center gap-3">
+          <span className="no-print ml-auto flex flex-wrap items-center gap-2">
             <span>{t.export}:</span>
-            <a className="text-accent underline underline-offset-2" href={exportUrl(result.id, "md")}>
+            <a className="btn btn-outline btn-sm" href={exportUrl(result.id, "md")}>
               {t.exportMd}
             </a>
-            <a className="text-accent underline underline-offset-2" href={exportUrl(result.id, "json")}>
+            <a className="btn btn-outline btn-sm" href={exportUrl(result.id, "json")}>
               {t.exportJson}
             </a>
-            <button type="button" onClick={() => window.print()} className="text-accent underline underline-offset-2">
+            <button type="button" onClick={() => window.print()} className="btn btn-outline btn-sm">
               {t.print}
             </button>
           </span>

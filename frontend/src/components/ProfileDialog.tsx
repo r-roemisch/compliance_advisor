@@ -44,10 +44,10 @@ export function ProfileDialog(props: {
       ref={ref}
       onClose={props.onClose}
       aria-labelledby="profile-title"
-      className="m-auto w-[min(640px,calc(100vw-32px))] rounded border border-line bg-panel p-0 text-ink backdrop:bg-black/40"
+      className="m-auto w-[min(640px,calc(100vw-32px))] rounded-2xl border border-line bg-panel p-0 text-ink shadow-dialog backdrop:bg-[#0b141e]/50 backdrop:backdrop-blur-[2px]"
     >
       <form method="dialog" className="flex max-h-[85vh] flex-col">
-        <div className="overflow-y-auto px-5 py-4">
+        <div className="overflow-y-auto px-6 py-5">
           <h2 id="profile-title" className="text-lg font-semibold">
             {t.profileTitle}
           </h2>
@@ -60,7 +60,7 @@ export function ProfileDialog(props: {
                 key={p.id}
                 type="button"
                 onClick={() => setDraft(p.profile)}
-                className="rounded border border-line px-2.5 py-1 text-sm hover:border-accent hover:text-accent"
+                className="chip py-1 hover:border-accent hover:text-accent"
               >
                 {p.label[lang]}
               </button>
@@ -73,7 +73,7 @@ export function ProfileDialog(props: {
               <select
                 value={draft.firm_type}
                 onChange={(e) => setDraft({ ...draft, firm_type: e.target.value })}
-                className="rounded border border-line bg-panel px-2 py-1.5"
+                className="field"
               >
                 {Object.entries(FIRM_TYPES).map(([id, label]) => (
                   <option key={id} value={id}>
@@ -86,7 +86,7 @@ export function ProfileDialog(props: {
               <legend className="mb-1 font-medium">{t.size}</legend>
               {Object.entries(SIZES).map(([id, label]) => (
                 <label key={id} className="mr-3 inline-flex items-center gap-1.5">
-                  <input type="radio" name="size" checked={draft.size === id} onChange={() => setDraft({ ...draft, size: id })} />
+                  <input type="radio" className="accent-accent" name="size" checked={draft.size === id} onChange={() => setDraft({ ...draft, size: id })} />
                   {label[lang]}
                 </label>
               ))}
@@ -97,6 +97,7 @@ export function ProfileDialog(props: {
                 <label key={id} className="mr-3 inline-flex items-center gap-1.5">
                   <input
                     type="radio"
+                    className="accent-accent"
                     name="customers"
                     checked={draft.customers === id}
                     onChange={() => setDraft({ ...draft, customers: id })}
@@ -110,7 +111,7 @@ export function ProfileDialog(props: {
               <div className="grid gap-1 sm:grid-cols-2">
                 {Object.entries(ACTIVITIES).map(([id, label]) => (
                   <label key={id} className="inline-flex items-center gap-1.5">
-                    <input type="checkbox" checked={draft.activities.includes(id)} onChange={() => toggle(id)} />
+                    <input type="checkbox" className="accent-accent" checked={draft.activities.includes(id)} onChange={() => toggle(id)} />
                     {label[lang]}
                   </label>
                 ))}
@@ -118,18 +119,18 @@ export function ProfileDialog(props: {
             </fieldset>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2 border-t border-line px-5 py-3">
+        <div className="flex flex-wrap items-center gap-2 border-t border-line px-6 py-3.5">
           <button
             type="button"
             onClick={() => props.onApply(draft)}
-            className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-accent-ink"
+            className="btn btn-primary"
           >
             {t.applyProfile}
           </button>
-          <button type="button" onClick={() => props.onApply(null)} className="rounded px-3 py-1.5 text-sm hover:bg-panel-2">
+          <button type="button" onClick={() => props.onApply(null)} className="btn btn-quiet">
             {t.clearProfile}
           </button>
-          <button type="button" onClick={props.onClose} className="ml-auto rounded px-3 py-1.5 text-sm hover:bg-panel-2">
+          <button type="button" onClick={props.onClose} className="btn btn-quiet ml-auto">
             {t.cancel}
           </button>
         </div>

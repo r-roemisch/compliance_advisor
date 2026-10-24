@@ -7,6 +7,26 @@ import type { FirmProfile, HistoryItem, Lang, SourceInfo } from "@/lib/types";
 import { LayerGlyph, layerName } from "./LayerGlyph";
 import { TimelinePanel } from "./TimelinePanel";
 
+type Group = { label: string; recent: boolean; items: HistoryItem[] };
+
+/** Today, yesterday and earlier, by the browser's own calendar day. */
+function groupByDay(history: HistoryItem[], t: Strings): Group[] {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const startOfYesterday = new Date(startOfToday);
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+  const groups: Group[] = [
+    { label: t.today, recent: true, items: [] },
+    { label: t.yesterday, recent: true, items: [] },
+    { label: t.earlier, recent: false, items: [] },
+  ];
+  for (const h of history) {
+    const at = new Date(h.created_at);
+    groups[at >= startOfToday ? 0 : at >= startOfYesterday ? 1 : 2].items.push(h);
+  }
+  return groups.filter((g) => g.items.length > 0);
+}
+
 export function Sidebar(props: {
   t: Strings;
   lang: Lang;
@@ -19,35 +39,24 @@ export function Sidebar(props: {
 }) {
   const { t, lang, history, sources } = props;
   const [tab, setTab] = useState<"history" | "timeline" | "sources">("history");
-  const fmt = new Intl.DateTimeFormat(lang === "de" ? "de-DE" : "en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const locale = lang === "de" ? "de-DE" : "en-GB";
+  const timeFmt = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" });
+  const fullFmt = new Intl.DateTimeFormat(locale, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
   const byRegime = Object.keys(REGIMES)
     .map((regime) => ({ regime, items: sources.filter((s) => s.regime === regime) }))
     .filter((g) => g.items.length > 0);
 
   return (
     <aside className="no-print order-2 flex flex-col gap-3 lg:order-none lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)]">
-      <button
-        type="button"
-        onClick={props.onNew}
-        className="rounded border border-line bg-panel px-3 py-2 text-left text-sm font-medium hover:border-accent"
-      >
+      <button type="button" onClick={props.onNew} className="btn btn-outline justify-start py-2">
+        <svg aria-hidden width="14" height="14" viewBox="0 0 14 14" className="text-accent">
+          <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
         {t.newQuestion}
       </button>
-      <div role="tablist" className="flex border-b border-line text-sm">
+      <div role="tablist" className="switch text-sm">
         {(["history", "timeline", "sources"] as const).map((id) => (
-          <button
-            key={id}
-            role="tab"
-            type="button"
-            aria-selected={tab === id}
-            onClick={() => setTab(id)}
-            className={`-mb-px border-b-2 px-3 py-1.5 ${tab === id ? "border-ink font-medium" : "border-transparent text-ink-2"}`}
-          >
+          <button key={id} role="tab" type="button" aria-selected={tab === id} onClick={() => setTab(id)} className="flex-1 px-2 text-center">
             {id === "history" ? t.history : id === "timeline" ? t.timeline : t.sources}
           </button>
         ))}
@@ -58,25 +67,37 @@ export function Sidebar(props: {
           <TimelinePanel t={t} lang={lang} profile={props.profile} />
         ) : tab === "history" ? (
           history.length === 0 ? (
-            <p className="text-sm text-ink-3">{t.historyEmpty}</p>
+            <p className="px-2.5 text-sm text-ink-3">{t.historyEmpty}</p>
           ) : (
-            <ul className="flex flex-col">
-              {history.map((h) => (
-                <li key={h.id}>
-                  <button
-                    type="button"
-                    onClick={() => props.onOpen(h.id)}
-                    aria-current={props.currentId === h.id}
-                    className={`w-full rounded px-2 py-2 text-left text-sm hover:bg-panel ${
-                      props.currentId === h.id ? "bg-panel" : ""
-                    }`}
-                  >
-                    <span className="line-clamp-2">{h.question}</span>
-                    <span className="mt-0.5 block text-xs text-ink-3 tabular-nums">{fmt.format(new Date(h.created_at))}</span>
-                  </button>
-                </li>
+            <div className="flex flex-col gap-3">
+              {groupByDay(history, t).map((group) => (
+                <section key={group.label}>
+                  <h3 className="px-2.5 pb-1 text-xs font-medium text-ink-3">{group.label}</h3>
+                  <ul className="flex flex-col gap-0.5">
+                    {group.items.map((h) => {
+                      const current = props.currentId === h.id;
+                      return (
+                        <li key={h.id}>
+                          <button
+                            type="button"
+                            onClick={() => props.onOpen(h.id)}
+                            aria-current={current}
+                            className={`w-full rounded-lg px-2.5 py-2 text-left text-sm transition-colors ${
+                              current ? "bg-panel text-ink shadow-[0_1px_2px_var(--shadow)]" : "text-ink-2 hover:bg-panel hover:text-ink"
+                            }`}
+                          >
+                            <span className="line-clamp-2">{h.question}</span>
+                            <span className="mt-0.5 block text-xs text-ink-3 tabular-nums">
+                              {(group.recent ? timeFmt : fullFmt).format(new Date(h.created_at))}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
               ))}
-            </ul>
+            </div>
           )
         ) : (
           <div className="flex flex-col gap-4">

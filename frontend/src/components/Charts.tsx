@@ -50,7 +50,7 @@ export function ActivityChart(props: {
                   />
                 )}
                 {hover === i && (
-                  <div className="pointer-events-none absolute bottom-full z-10 mb-1 whitespace-nowrap rounded border border-line bg-panel px-2 py-1 text-xs shadow-sm">
+                  <div className="pointer-events-none absolute bottom-full z-10 mb-1 whitespace-nowrap rounded-lg border border-line bg-panel px-2.5 py-1.5 text-xs shadow-[0_4px_12px_-4px_var(--shadow)]">
                     <span className="block text-ink-2">{day.format(new Date(d.date))}</span>
                     <span className="font-semibold tabular-nums">{props.tooltip(d.count)}</span>
                   </div>

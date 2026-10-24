@@ -53,13 +53,13 @@ export function PassageList(props: {
               tabIndex={-1}
               onMouseEnter={() => props.onHover(p.n)}
               onMouseLeave={() => props.onHover(null)}
-              className={`scroll-mt-4 rounded border bg-panel transition-colors ${
+              className={`scroll-mt-4 rounded-xl border bg-panel transition-colors ${
                 highlighted ? "border-accent bg-mark" : "border-line"
               } ${isCited ? "" : "opacity-75"}`}
             >
               <div className="flex items-start gap-3 px-4 pt-3">
                 <span
-                  className={`mt-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-sm px-1 text-[11px] font-semibold tabular-nums ${
+                  className={`mt-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-md px-1 text-[11px] font-semibold tabular-nums ${
                     isCited ? "bg-accent text-accent-ink" : "border border-line text-ink-2"
                   }`}
                 >
@@ -79,7 +79,7 @@ export function PassageList(props: {
                     </span>
                     <span>{p.issuer}</span>
                     {later ? (
-                      <span className="font-medium text-amber">{LEGAL_STATUS[p.legal_status]?.[lang] ?? p.legal_status}</span>
+                      <span className="rounded-full bg-amber-soft px-2 font-medium text-amber">{LEGAL_STATUS[p.legal_status]?.[lang] ?? p.legal_status}</span>
                     ) : (
                       <span>{LEGAL_STATUS.in_force[lang]}</span>
                     )}

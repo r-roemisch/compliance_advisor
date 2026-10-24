@@ -25,7 +25,7 @@ import {
   logout,
   saveProfile,
 } from "@/lib/api";
-import { EXAMPLES, STRINGS } from "@/lib/i18n";
+import { EXAMPLES, REGIMES, STRINGS } from "@/lib/i18n";
 import { readStored, writeStored } from "@/lib/storage";
 import type { AskResponse, FirmProfile, HistoryItem, Lang, ModelOption, Preset, SourceInfo, Stage, User } from "@/lib/types";
 
@@ -223,6 +223,7 @@ export default function App({ initialView = "research" }: { initialView?: View }
 
   const highlighted = hover ?? active;
   const busy = stage !== null;
+  const regimes = Object.keys(REGIMES).filter((r) => sources.some((s) => s.regime === r));
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -237,9 +238,6 @@ export default function App({ initialView = "research" }: { initialView?: View }
         onTheme={setTheme}
         profile={profile}
         onEditProfile={() => setProfileOpen(true)}
-        models={models}
-        model={model}
-        onModel={chooseModel}
         view={view}
         onView={go}
         user={user}
@@ -283,10 +281,20 @@ export default function App({ initialView = "research" }: { initialView?: View }
         />
 
         <main id="main" className="order-1 min-w-0 lg:order-none">
-          <Composer t={t} value={question} onChange={setQuestion} onSubmit={submit} busy={busy} />
+          <Composer
+            t={t}
+            lang={lang}
+            value={question}
+            onChange={setQuestion}
+            onSubmit={submit}
+            busy={busy}
+            models={models}
+            model={model}
+            onModel={chooseModel}
+          />
 
           {error && (
-            <div role="alert" className="mt-4 flex flex-wrap items-center gap-3 border-l-[3px] border-red bg-red-soft px-3 py-2 text-sm">
+            <div role="alert" className="mt-4 flex flex-wrap items-center gap-3 rounded-lg bg-red-soft px-4 py-2.5 text-sm">
               <span>{error}</span>
               {question.trim().length >= 3 && (
                 <button type="button" onClick={submit} className="font-medium text-red underline underline-offset-2">
@@ -302,11 +310,23 @@ export default function App({ initialView = "research" }: { initialView?: View }
             )}
 
             {!busy && !result && (
-              <section className="max-w-[70ch] py-2">
-                <h1 className="text-xl font-semibold leading-snug">{t.emptyTitle}</h1>
-                <p className="mt-2 text-ink-2">{t.emptyBody}</p>
-                <h2 className="mt-5 text-sm font-semibold text-ink-2">{t.examplesTitle}</h2>
-                <ul className="mt-2 flex flex-col gap-2">
+              <section className="max-w-[820px] pt-4">
+                <h1 className="max-w-[24ch] text-[26px] font-semibold leading-[1.15] tracking-tight text-balance sm:text-[30px]">
+                  {t.emptyTitle}
+                </h1>
+                <p className="mt-3 max-w-[62ch] text-ink-2">{t.emptyBody}</p>
+                {regimes.length > 0 && (
+                  <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+                    <span className="text-ink-2">{t.coverage(sources.length, regimes.length)}</span>
+                    {regimes.map((r) => (
+                      <span key={r} className="rounded-full bg-track px-2.5 py-0.5 text-xs text-ink-2">
+                        {REGIMES[r]?.[lang] ?? r}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <h2 className="mt-8 text-sm font-semibold text-ink-2">{t.examplesTitle}</h2>
+                <ul className="mt-3 grid gap-3 sm:grid-cols-2">
                   {[...EXAMPLES[lang], ...EXAMPLES[lang === "de" ? "en" : "de"].slice(0, 1)].map((example) => (
                     <li key={example}>
                       <button
@@ -315,7 +335,7 @@ export default function App({ initialView = "research" }: { initialView?: View }
                           setQuestion(example);
                           document.getElementById("question")?.focus();
                         }}
-                        className="text-left text-sm text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent"
+                        className="h-full w-full rounded-xl border border-line bg-panel px-4 py-3 text-left text-sm leading-relaxed transition-colors hover:border-accent hover:text-accent"
                       >
                         {example}
                       </button>

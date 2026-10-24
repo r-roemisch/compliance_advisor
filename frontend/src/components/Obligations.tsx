@@ -54,13 +54,13 @@ export function Obligations(props: { t: Strings; answerId: string; initial: Obli
             type="button"
             onClick={run}
             disabled={busy}
-            className="no-print rounded border border-accent px-3 py-1 text-sm font-medium text-accent hover:bg-accent-soft disabled:opacity-50"
+            className="no-print btn btn-accent btn-sm"
           >
             {busy ? t.extracting : t.extractObligations}
           </button>
         ) : (
           rows.length > 0 && (
-            <button type="button" onClick={download} className="no-print text-sm text-accent underline underline-offset-2">
+            <button type="button" onClick={download} className="no-print btn btn-outline btn-sm">
               {t.downloadCsv}
             </button>
           )
@@ -70,7 +70,7 @@ export function Obligations(props: { t: Strings; answerId: string; initial: Obli
       {error && <p className="text-sm text-red">{error}</p>}
       {rows !== null && rows.length === 0 && <p className="text-sm text-ink-3">{t.noObligations}</p>}
       {rows !== null && rows.length > 0 && (
-        <div className="overflow-x-auto rounded border border-line bg-panel">
+        <div className="overflow-x-auto rounded-xl border border-line bg-panel">
           <table className="w-full min-w-[640px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-line text-left text-ink-2">

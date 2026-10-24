@@ -42,7 +42,7 @@ export function Progress({
   const position = order.indexOf(stage);
 
   return (
-    <div role="status" aria-live="polite" className="rounded border border-line bg-panel px-4 py-3">
+    <div role="status" aria-live="polite" className="rounded-xl border border-line bg-panel px-4 py-3">
       <ol className="flex flex-col gap-1.5 text-sm">
         {steps.map((step) => {
           const index = order.indexOf(step.id);

@@ -2,20 +2,24 @@
 
 /*
   Compliance Advisor tokens.
-  Navy ink on warm grey; white panels; one accent (petrol) for interaction;
-  amber and red only for status. Binding law is drawn solid, supervisory expectation outlined.
+  Deep navy ink on a cool blue-grey page; white panels; one accent (petrol) for everything
+  you can click; amber and red only for status. Binding law is drawn solid, supervisory
+  expectation outlined. Every text colour passes 4.5:1 on the surfaces it sits on.
 */
 :root {
-  --ink: #15253d;          /* navy: text, headings, binding-law marks */
-  --ink-2: #4b5a70;        /* slate: secondary text */
-  --ink-3: #7a8597;        /* tertiary text, rules */
-  --ground: #efeeeb;       /* warm grey page */
+  --ink: #0f1d2e;          /* navy: text, headings, binding-law marks */
+  --ink-2: #4a5869;        /* slate: secondary text */
+  --ink-3: #5f6b7c;        /* tertiary text: dates, counters */
+  --ground: #f2f5f7;       /* cool blue-grey page */
   --panel: #ffffff;
-  --panel-2: #f7f6f4;      /* recessed areas inside panels */
-  --line: #d9d6d0;
-  --accent: #0b6870;       /* petrol: links, focus, primary action */
+  --panel-2: #f5f7f9;      /* recessed areas inside panels, row hover */
+  --line: #dde3e8;
+  --track: #e7ecf0;        /* pill switches: the groove */
+  --raised: #ffffff;       /* pill switches: the selected item */
+  --accent: #0b6a72;       /* petrol: links, focus, primary action */
+  --accent-hover: #08585f;
   --accent-ink: #ffffff;
-  --accent-soft: #e2efef;
+  --accent-soft: #e0eff0;
   --amber: #9a5b00;
   --amber-soft: #fbf0dc;
   --red: #a62018;
@@ -23,20 +27,24 @@
   --ok: #1f6b3a;
   --mark: #fff1b8;         /* highlight of the active citation's passage */
   --chart: #00909c;        /* chart marks; validated (dataviz checks) on the light panel */
+  --shadow: rgba(15, 29, 46, 0.1);
   color-scheme: light;
 }
 
 :root[data-theme="dark"] {
-  --ink: #e4e8ef;
-  --ink-2: #a9b4c4;
-  --ink-3: #7c889a;
-  --ground: #0f1a2b;
-  --panel: #16233a;
-  --panel-2: #1b2a44;
-  --line: #2c3c58;
-  --accent: #5cc0c4;
-  --accent-ink: #08252a;
-  --accent-soft: #163a44;
+  --ink: #e6ecf2;
+  --ink-2: #a6b3c2;
+  --ink-3: #8492a3;
+  --ground: #0b141e;
+  --panel: #111d2a;
+  --panel-2: #0d1823;
+  --line: #24364a;
+  --track: #162433;
+  --raised: #24364a;
+  --accent: #5bc2c7;
+  --accent-hover: #7dd3d7;
+  --accent-ink: #062327;
+  --accent-soft: #12343c;
   --amber: #e7a948;
   --amber-soft: #3a2b12;
   --red: #f08a80;
@@ -44,21 +52,25 @@
   --ok: #7fcf98;
   --mark: #3d3a1c;
   --chart: #1fa3ad;        /* validated on the dark panel */
+  --shadow: rgba(0, 0, 0, 0.45);
   color-scheme: dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --ink: #e4e8ef;
-    --ink-2: #a9b4c4;
-    --ink-3: #7c889a;
-    --ground: #0f1a2b;
-    --panel: #16233a;
-    --panel-2: #1b2a44;
-    --line: #2c3c58;
-    --accent: #5cc0c4;
-    --accent-ink: #08252a;
-    --accent-soft: #163a44;
+    --ink: #e6ecf2;
+    --ink-2: #a6b3c2;
+    --ink-3: #8492a3;
+    --ground: #0b141e;
+    --panel: #111d2a;
+    --panel-2: #0d1823;
+    --line: #24364a;
+    --track: #162433;
+    --raised: #24364a;
+    --accent: #5bc2c7;
+    --accent-hover: #7dd3d7;
+    --accent-ink: #062327;
+    --accent-soft: #12343c;
     --amber: #e7a948;
     --amber-soft: #3a2b12;
     --red: #f08a80;
@@ -66,6 +78,7 @@
     --ok: #7fcf98;
     --mark: #3d3a1c;
     --chart: #1fa3ad;
+    --shadow: rgba(0, 0, 0, 0.45);
     color-scheme: dark;
   }
 }
@@ -78,7 +91,10 @@
   --color-panel: var(--panel);
   --color-panel-2: var(--panel-2);
   --color-line: var(--line);
+  --color-track: var(--track);
+  --color-raised: var(--raised);
   --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
   --color-accent-ink: var(--accent-ink);
   --color-accent-soft: var(--accent-soft);
   --color-amber: var(--amber);
@@ -88,6 +104,9 @@
   --color-ok: var(--ok);
   --color-mark: var(--mark);
   --color-chart: var(--chart);
+  /* Only the question box floats; everything else sits flat on the page. */
+  --shadow-raise: 0 1px 2px var(--shadow), 0 12px 32px -16px var(--shadow);
+  --shadow-dialog: 0 24px 64px -24px var(--shadow);
   --font-sans: var(--font-plex-sans), system-ui, sans-serif;
   --font-serif: var(--font-plex-serif), Georgia, serif;
   --font-cond: var(--font-plex-cond), var(--font-plex-sans), sans-serif;
@@ -109,7 +128,129 @@ body {
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 2px;
+  border-radius: 6px;
+}
+
+/*
+  Shared controls. Shapes follow the role: 8px for buttons and fields, 12px for panels,
+  16px for the question box, full round for chips and pill switches.
+*/
+@layer components {
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    border-radius: 0.5rem;
+    border: 1px solid transparent;
+    padding: 0.4rem 0.85rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    white-space: nowrap;
+    transition: background-color 120ms, border-color 120ms, color 120ms;
+  }
+  .btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+  .btn-primary:not(:disabled):hover {
+    background: var(--accent-hover);
+  }
+  .btn-outline {
+    background: var(--panel);
+    border-color: var(--line);
+    color: var(--ink);
+  }
+  .btn-outline:not(:disabled):hover {
+    border-color: var(--ink-3);
+  }
+  .btn-accent {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .btn-accent:not(:disabled):hover {
+    background: var(--accent-soft);
+  }
+  .btn-quiet {
+    color: var(--ink-2);
+  }
+  .btn-quiet:not(:disabled):hover {
+    background: var(--track);
+    color: var(--ink);
+  }
+  .btn-sm {
+    padding: 0.2rem 0.6rem;
+    font-size: 0.8125rem;
+  }
+
+  .field {
+    border-radius: 0.5rem;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    padding: 0.45rem 0.75rem;
+    font-size: 0.875rem;
+    transition: border-color 120ms;
+  }
+  .field:hover {
+    border-color: var(--ink-3);
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    padding: 0.3rem 0.8rem;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    transition: border-color 120ms;
+  }
+  .chip:hover {
+    border-color: var(--ink-3);
+  }
+
+  /* A row of options in a groove; the chosen one is lifted out of it. */
+  .switch {
+    display: flex;
+    gap: 2px;
+    border-radius: 0.65rem;
+    background: var(--track);
+    padding: 3px;
+  }
+  .switch > * {
+    border-radius: 0.45rem;
+    padding: 0.25rem 0.75rem;
+    color: var(--ink-2);
+    white-space: nowrap;
+    transition: background-color 120ms, color 120ms;
+  }
+  .switch > *:hover {
+    color: var(--ink);
+  }
+  .switch > [aria-selected="true"],
+  .switch > [aria-pressed="true"],
+  .switch > [aria-current="page"] {
+    background: var(--raised);
+    color: var(--ink);
+    font-weight: 500;
+    box-shadow: 0 1px 2px var(--shadow);
+  }
+
+  .kbd {
+    font-family: inherit;
+    border-radius: 0.3rem;
+    border: 1px solid var(--line);
+    padding: 0 0.3rem;
+    font-size: 0.6875rem;
+    line-height: 1.1rem;
+  }
 }
 
 /* Provision references: the one typographic signature. */

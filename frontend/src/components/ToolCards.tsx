@@ -25,7 +25,7 @@ function RefLinks({ refs }: { refs?: Ref[] }) {
 function Missing({ t, items }: { t: Strings; items?: string[] }) {
   if (!items?.length) return null;
   return (
-    <div className="mt-3 border-l-[3px] border-amber bg-amber-soft px-3 py-2 text-sm">
+    <div className="mt-3 rounded-lg bg-amber-soft px-3 py-2 text-sm">
       <p className="font-medium text-amber">{t.missingFacts}</p>
       <ul className="mt-1 list-disc pl-5 text-ink">
         {items.map((m) => (
@@ -177,8 +177,8 @@ export function ToolCards({ t, lang, tools }: { t: Strings; lang: Lang; tools: T
       </h2>
       <div className="flex flex-col gap-3">
         {tools.map((run, i) => (
-          <article key={i} className="rounded border border-line bg-panel">
-            <h3 className="border-b border-line px-4 py-2 text-sm font-semibold">{TOOL_NAMES[run.name]?.[lang] ?? run.name}</h3>
+          <article key={i} className="overflow-hidden rounded-xl border border-line bg-panel">
+            <h3 className="border-b border-line bg-panel-2 px-4 py-2.5 text-sm font-semibold">{TOOL_NAMES[run.name]?.[lang] ?? run.name}</h3>
             <div className="px-4 py-3">
               {"error" in run.result ? (
                 <p className="text-sm text-red">{String(run.result.error)}</p>

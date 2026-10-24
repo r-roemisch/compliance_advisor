@@ -61,10 +61,10 @@ export function Dashboard(props: {
 
   if (!user) {
     return (
-      <section className="max-w-[60ch] py-6">
-        <h1 className="text-xl font-semibold">{t.dashboard}</h1>
-        <p className="mt-2 text-ink-2">{t.guestDashboard}</p>
-        <button type="button" onClick={props.onSignIn} className="mt-4 rounded bg-accent px-4 py-2 text-sm font-medium text-accent-ink">
+      <section className="max-w-[60ch] pt-4">
+        <h1 className="text-[26px] font-semibold leading-tight tracking-tight">{t.dashboard}</h1>
+        <p className="mt-3 text-ink-2">{t.guestDashboard}</p>
+        <button type="button" onClick={props.onSignIn} className="btn btn-primary mt-5">
           {t.signIn} / {t.signUp}
         </button>
       </section>
@@ -90,8 +90,8 @@ export function Dashboard(props: {
                 type="button"
                 onClick={() => show(s)}
                 aria-current={section === s ? "page" : undefined}
-                className={`w-full whitespace-nowrap rounded px-3 py-2 text-left text-sm ${
-                  section === s ? "bg-panel font-medium text-ink shadow-[inset_2px_0_0_var(--accent)]" : "text-ink-2 hover:bg-panel"
+                className={`w-full whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                  section === s ? "bg-panel font-medium text-ink shadow-[0_1px_2px_var(--shadow)]" : "text-ink-2 hover:bg-panel hover:text-ink"
                 }`}
               >
                 {labels[s]}
@@ -108,29 +108,29 @@ export function Dashboard(props: {
           <div className="flex flex-col gap-6">
             <header className="flex flex-wrap items-end justify-between gap-3">
               <div>
-                <h1 className="text-xl font-semibold">{t.greeting(user.name)}</h1>
+                <h1 className="text-[26px] font-semibold leading-tight tracking-tight">{t.greeting(user.name)}</h1>
                 {user.profile && (
-                  <p className="text-sm text-ink-2">
+                  <p className="mt-1 text-sm text-ink-2">
                     {FIRM_TYPES[user.profile.firm_type]?.[lang]}, {SIZES[user.profile.size]?.[lang]}
                   </p>
                 )}
               </div>
-              <button type="button" onClick={props.onNewQuestion} className="rounded bg-accent px-4 py-2 text-sm font-medium text-accent-ink">
+              <button type="button" onClick={props.onNewQuestion} className="btn btn-primary">
                 {t.newQuestionCta}
               </button>
             </header>
 
             <dl className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3">
-              <div className="rounded border border-line bg-panel px-4 py-3">
+              <div className="rounded-xl border border-line bg-panel px-5 py-4">
                 <dt className="text-sm text-ink-2">{t.statQuestions}</dt>
                 <dd className="mt-1 text-2xl font-semibold tabular-nums">{data?.stats.questions ?? "–"}</dd>
                 <dd className="text-xs text-ink-3">{data ? t.statQuestions7d(data.stats.questions_7d) : ""}</dd>
               </div>
-              <div className="rounded border border-line bg-panel px-4 py-3">
+              <div className="rounded-xl border border-line bg-panel px-5 py-4">
                 <dt className="text-sm text-ink-2">{t.statObligations}</dt>
                 <dd className="mt-1 text-2xl font-semibold tabular-nums">{data?.stats.obligations ?? "–"}</dd>
               </div>
-              <div className="rounded border border-line bg-panel px-4 py-3">
+              <div className="rounded-xl border border-line bg-panel px-5 py-4">
                 <dt className="text-sm text-ink-2">{t.nextDate}</dt>
                 {data?.upcoming[0] ? (
                   <>
@@ -146,12 +146,12 @@ export function Dashboard(props: {
             </dl>
 
             <div className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-              <section aria-labelledby="activity-title" className="rounded border border-line bg-panel px-4 py-3">
+              <section aria-labelledby="activity-title" className="rounded-xl border border-line bg-panel px-5 py-4">
                 <h2 id="activity-title" className="text-sm font-semibold">{t.activityTitle}</h2>
                 <p className="mb-3 text-xs text-ink-3">{t.activitySub}</p>
                 {data && <ActivityChart data={data.activity} lang={lang} tooltip={t.activityTooltip} label={t.activityTitle} />}
               </section>
-              <section aria-labelledby="topics-title" className="rounded border border-line bg-panel px-4 py-3">
+              <section aria-labelledby="topics-title" className="rounded-xl border border-line bg-panel px-5 py-4">
                 <h2 id="topics-title" className="text-sm font-semibold">{t.regimesTitle}</h2>
                 <p className="mb-3 text-xs text-ink-3">{t.regimesSub}</p>
                 {data && (
@@ -161,9 +161,9 @@ export function Dashboard(props: {
             </div>
 
             <section aria-labelledby="recent-title">
-              <div className="mb-2 flex items-baseline justify-between">
+              <div className="mb-2 flex items-center justify-between">
                 <h2 id="recent-title" className="text-sm font-semibold">{t.recentTitle}</h2>
-                <button type="button" onClick={() => show("questions")} className="text-sm text-accent underline underline-offset-2">
+                <button type="button" onClick={() => show("questions")} className="btn btn-quiet btn-sm">
                   {t.showAll}
                 </button>
               </div>
@@ -180,11 +180,11 @@ export function Dashboard(props: {
 
         {section === "account" && (
           <div className="flex max-w-[640px] flex-col gap-6">
-            <h1 className="text-xl font-semibold">{t.accountTitle}</h1>
-            <section aria-labelledby="acc-profile" className="rounded border border-line bg-panel px-4 py-3">
+            <h1 className="text-[26px] font-semibold leading-tight tracking-tight">{t.accountTitle}</h1>
+            <section aria-labelledby="acc-profile" className="rounded-xl border border-line bg-panel px-5 py-4">
               <div className="flex items-center justify-between gap-3">
                 <h2 id="acc-profile" className="text-sm font-semibold">{t.profile}</h2>
-                <button type="button" onClick={props.onEditProfile} className="text-sm text-accent underline underline-offset-2">
+                <button type="button" onClick={props.onEditProfile} className="btn btn-outline btn-sm">
                   {user.profile ? t.editProfile : t.editProfileCta}
                 </button>
               </div>
@@ -199,7 +199,7 @@ export function Dashboard(props: {
                 <p className="mt-2 text-sm text-ink-3">{t.noProfile}</p>
               )}
             </section>
-            <section aria-labelledby="acc-account" className="rounded border border-line bg-panel px-4 py-3 text-sm">
+            <section aria-labelledby="acc-account" className="rounded-xl border border-line bg-panel px-5 py-4 text-sm">
               <h2 id="acc-account" className="font-semibold">{t.account}</h2>
               <p className="mt-2">
                 <span className="text-ink-2">{t.signedInAs} </span>
@@ -207,8 +207,8 @@ export function Dashboard(props: {
                 {user.email}
               </p>
               <p className="mt-2 text-xs text-ink-3">{t.accountPrivacy}</p>
-              <div className="mt-3 flex flex-wrap gap-4">
-                <button type="button" onClick={props.onSignOut} className="rounded border border-line px-3 py-1.5 hover:border-ink-3">
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button type="button" onClick={props.onSignOut} className="btn btn-outline">
                   {t.signOut}
                 </button>
                 <button
@@ -218,7 +218,7 @@ export function Dashboard(props: {
                     await deleteAccount();
                     props.onDeleted();
                   }}
-                  className="text-red underline underline-offset-2"
+                  className="btn text-red hover:bg-red-soft"
                 >
                   {t.deleteAccount}
                 </button>
@@ -241,9 +241,9 @@ function QuestionTable(props: {
   empty?: string;
 }) {
   const { t, lang } = props;
-  if (props.rows.length === 0) return <p className="rounded border border-line bg-panel px-4 py-3 text-sm text-ink-3">{props.empty ?? t.archiveEmpty}</p>;
+  if (props.rows.length === 0) return <p className="rounded-xl border border-line bg-panel px-5 py-4 text-sm text-ink-3">{props.empty ?? t.archiveEmpty}</p>;
   return (
-    <div className="overflow-x-auto rounded border border-line bg-panel">
+    <div className="overflow-x-auto rounded-xl border border-line bg-panel">
       <table className="w-full border-collapse text-sm md:min-w-[720px]">
         <thead>
           <tr className="border-b border-line text-left text-xs text-ink-2">
@@ -266,7 +266,7 @@ function QuestionTable(props: {
               <td className="px-4 py-2.5">
                 <span className="flex flex-wrap gap-1">
                   {props.topics(r.regimes).map((name) => (
-                    <span key={name} className="rounded-sm bg-panel-2 px-1.5 py-0.5 text-xs text-ink-2">{name}</span>
+                    <span key={name} className="rounded-full bg-track px-2 py-0.5 text-xs text-ink-2">{name}</span>
                   ))}
                 </span>
               </td>
@@ -306,9 +306,9 @@ function QuestionsSection(props: {
   return (
     <section aria-labelledby="questions-title" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h1 id="questions-title" className="text-xl font-semibold">{t.archive}</h1>
+        <h1 id="questions-title" className="text-[26px] font-semibold leading-tight tracking-tight">{t.archive}</h1>
         <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t.archiveSearch} aria-label={t.archiveSearch}
-          className="w-full rounded border border-line bg-panel px-3 py-1.5 text-sm sm:w-72" />
+          className="field w-full sm:w-72" />
       </div>
       {rows && (
         <QuestionTable rows={rows} t={t} lang={props.lang} timeFmt={props.timeFmt} topics={props.topics} onOpen={props.onOpen}
@@ -349,21 +349,21 @@ function ObligationsSection(props: { t: Strings; timeFmt: Intl.DateTimeFormat; o
     <section aria-labelledby="inventory-title" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 id="inventory-title" className="text-xl font-semibold">{t.inventoryTitle}</h1>
-          <p className="max-w-[70ch] text-sm text-ink-2">{t.inventoryIntro}</p>
+          <h1 id="inventory-title" className="text-[26px] font-semibold leading-tight tracking-tight">{t.inventoryTitle}</h1>
+          <p className="mt-1 max-w-[70ch] text-sm text-ink-2">{t.inventoryIntro}</p>
         </div>
         <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
           <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t.inventorySearch} aria-label={t.inventorySearch}
-            className="w-full rounded border border-line bg-panel px-3 py-1.5 text-sm sm:w-64" />
+            className="field w-full sm:w-64" />
           {shown.length > 0 && (
-            <button type="button" onClick={download} className="text-sm text-accent underline underline-offset-2">{t.downloadAll}</button>
+            <button type="button" onClick={download} className="btn btn-outline">{t.downloadAll}</button>
           )}
         </div>
       </div>
       {rows && shown.length === 0 ? (
-        <p className="rounded border border-line bg-panel px-4 py-3 text-sm text-ink-3">{search ? t.archiveNoMatch : t.inventoryEmpty}</p>
+        <p className="rounded-xl border border-line bg-panel px-5 py-4 text-sm text-ink-3">{search ? t.archiveNoMatch : t.inventoryEmpty}</p>
       ) : (
-        <div className="overflow-x-auto rounded border border-line bg-panel">
+        <div className="overflow-x-auto rounded-xl border border-line bg-panel">
           <table className="w-full min-w-[820px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-line text-left text-xs text-ink-2">
@@ -412,10 +412,10 @@ function DatesSection(props: { t: Strings; lang: Lang; user: User; dateFmt: Intl
   return (
     <section aria-labelledby="dates-title" className="flex max-w-[860px] flex-col gap-3">
       <div>
-        <h1 id="dates-title" className="text-xl font-semibold">{t.datesTitle}</h1>
-        <p className="text-sm text-ink-2">{user.profile ? t.datesIntro : t.datesIntroAll}</p>
+        <h1 id="dates-title" className="text-[26px] font-semibold leading-tight tracking-tight">{t.datesTitle}</h1>
+        <p className="mt-1 text-sm text-ink-2">{user.profile ? t.datesIntro : t.datesIntroAll}</p>
       </div>
-      <ol className="rounded border border-line bg-panel">
+      <ol className="rounded-xl border border-line bg-panel">
         {(entries ?? []).map((e, i) => (
           <li key={i} className="grid grid-cols-[8.5rem_1fr] gap-4 border-t border-line px-4 py-3 first:border-t-0 sm:grid-cols-[10rem_1fr]">
             <div>

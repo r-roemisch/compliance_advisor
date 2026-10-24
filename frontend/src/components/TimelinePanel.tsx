@@ -27,11 +27,11 @@ export function TimelinePanel({ t, lang, profile }: { t: Strings; lang: Lang; pr
     <div className="flex flex-col gap-3 text-sm">
       <div className="flex flex-col gap-1.5">
         <label className="inline-flex items-center gap-2">
-          <input type="checkbox" checked={upcoming} onChange={(e) => setUpcoming(e.target.checked)} />
+          <input type="checkbox" className="accent-accent" checked={upcoming} onChange={(e) => setUpcoming(e.target.checked)} />
           {t.upcomingOnly}
         </label>
         <label className={`inline-flex items-center gap-2 ${profile ? "" : "text-ink-3"}`}>
-          <input type="checkbox" checked={useProfile} disabled={!profile} onChange={(e) => setForProfile(e.target.checked)} />
+          <input type="checkbox" className="accent-accent" checked={useProfile} disabled={!profile} onChange={(e) => setForProfile(e.target.checked)} />
           {t.forProfile}
         </label>
       </div>

@@ -42,6 +42,27 @@ export function LayerGlyph({ layer, lang, size = 16 }: { layer: string; lang: La
   );
 }
 
+/** The app's mark: the whole stack at once, binding layers solid, supervisory ones outlined. */
+export function LayerMark({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={(size * 18) / 22} height={size} viewBox="0 0 18 22" aria-hidden className="shrink-0">
+      {LAYERS.map((l, i) => (
+        <rect
+          key={l.id}
+          x={1}
+          y={1 + i * 4.1}
+          width={16}
+          height={3.2}
+          rx={0.8}
+          fill={l.binding ? "var(--accent)" : "none"}
+          stroke="var(--accent)"
+          strokeWidth={1}
+        />
+      ))}
+    </svg>
+  );
+}
+
 export function layerName(layer: string, lang: Lang): string {
   return LAYERS.find((l) => l.id === layer)?.[lang] ?? layer;
 }
