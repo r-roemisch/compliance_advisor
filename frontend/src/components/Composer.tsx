@@ -3,7 +3,7 @@
 import type { FormEvent } from "react";
 
 import type { Strings } from "@/lib/i18n";
-import type { Lang, ModelOption } from "@/lib/types";
+import type { Lang, ModelOption, SearchStrategy } from "@/lib/types";
 
 export function Composer(props: {
   t: Strings;
@@ -15,6 +15,9 @@ export function Composer(props: {
   models: ModelOption[];
   model: string;
   onModel: (id: string) => void;
+  strategies: SearchStrategy[];
+  strategy: SearchStrategy;
+  onStrategy: (s: SearchStrategy) => void;
 }) {
   const { t, value, busy, models, model } = props;
   const tooShort = value.trim().length < 3;
@@ -63,6 +66,25 @@ export function Composer(props: {
               <path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </span>
+          {props.strategies.length > 1 && (
+            <span className="relative inline-flex" title={t.strategyNotes[props.strategy]}>
+              <select
+                value={props.strategy}
+                onChange={(e) => props.onStrategy(e.target.value as SearchStrategy)}
+                aria-label={t.strategy}
+                className="chip max-w-[15rem] cursor-pointer appearance-none truncate py-1 pr-7 text-[13px] text-ink-2"
+              >
+                {props.strategies.map((s) => (
+                  <option key={s} value={s}>
+                    {t.strategies[s]}
+                  </option>
+                ))}
+              </select>
+              <svg aria-hidden width="10" height="10" viewBox="0 0 10 10" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-3">
+                <path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+          )}
           <span id="question-help" className="mr-auto flex flex-wrap items-center gap-x-3 text-xs text-ink-3 tabular-nums">
             <span>{value.length > 0 && tooShort ? t.tooShort : t.charCount(value.length)}</span>
             <span className="hidden sm:inline">

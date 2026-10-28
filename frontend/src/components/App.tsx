@@ -20,14 +20,15 @@ import {
   loadHistory,
   loadMe,
   loadModels,
+  setUnauthorizedHandler,
   loadPresets,
   loadSources,
   logout,
   saveProfile,
 } from "@/lib/api";
 import { EXAMPLES, REGIMES, STRINGS } from "@/lib/i18n";
-import { readStored, writeStored } from "@/lib/storage";
-import type { AskResponse, FirmProfile, HistoryItem, Lang, ModelOption, Preset, SourceInfo, Stage, User } from "@/lib/types";
+import { readStored, validProfile, writeStored } from "@/lib/storage";
+import type { AskResponse, FirmProfile, HistoryItem, Lang, ModelOption, Preset, SearchStrategy, SourceInfo, Stage, User } from "@/lib/types";
 
 type Theme = "system" | "light" | "dark";
 export type View = "research" | "dashboard";
@@ -38,8 +39,11 @@ export default function App({ initialView = "research" }: { initialView?: View }
   // Rendered only in the browser (see app/page.tsx), so stored preferences can seed the state.
   const [lang, setLang] = useState<Lang>(() => readStored<Lang>("lang", "de"));
   const [theme, setTheme] = useState<Theme>(() => readStored<Theme>("theme", "system"));
-  const [profile, setProfile] = useState<FirmProfile | null>(() => readStored<FirmProfile | null>("profile", null));
+  const [profile, setProfile] = useState<FirmProfile | null>(() => validProfile(readStored("profile", null)));
+  const [listError, setListError] = useState(false);
   const [model, setModel] = useState("");
+  const [strategy, setStrategy] = useState<SearchStrategy>("vector");
+  const [strategies, setStrategies] = useState<SearchStrategy[]>([]);
   const [presets, setPresets] = useState<Preset[]>([]);
   const [models, setModels] = useState<ModelOption[]>([]);
   const [sources, setSources] = useState<SourceInfo[]>([]);
@@ -57,6 +61,14 @@ export default function App({ initialView = "research" }: { initialView?: View }
   const [view, setView] = useState<View>(initialView);
   const [user, setUser] = useState<User | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [authKey, setAuthKey] = useState(0);
+  // Each opening starts fresh on the tab the caller asked for ("Konto erstellen" or "Anmelden").
+  const openAuth = (mode: "login" | "register" = "login") => {
+    setAuthMode(mode);
+    setAuthKey((k) => k + 1);
+    setAuthOpen(true);
+  };
   const [refreshKey, setRefreshKey] = useState(0);
   const abort = useRef<AbortController | null>(null);
   const t = STRINGS[lang];
@@ -64,16 +76,19 @@ export default function App({ initialView = "research" }: { initialView?: View }
   // The lists the interface needs.
   useEffect(() => {
     const storedModel = readStored<string>("model", "");
+    const storedStrategy = readStored<string>("strategy", "");
     loadModels()
-      .then((list) => {
+      .then(({ models: list, strategies: offered, default_strategy }) => {
         setModels(list);
         setModel(list.some((m) => m.id === storedModel) ? storedModel : (list[0]?.id ?? ""));
+        setStrategies(offered);
+        setStrategy(offered.find((s) => s === storedStrategy) ?? default_strategy);
       })
       .catch(() => undefined);
     loadPresets().then(setPresets).catch(() => undefined);
     loadSources()
       .then(setSources)
-      .catch((e: ApiError) => setError(e.status === 0 ? STRINGS.de.errorUnreachable : e.message));
+      .catch(() => setListError(true));
     loadHistory().then(setHistory).catch(() => undefined);
     loadMe()
       .then((me) => me && signedIn(me))
@@ -93,10 +108,11 @@ export default function App({ initialView = "research" }: { initialView?: View }
   function signedIn(me: User) {
     setUser(me);
     setAuthOpen(false);
-    if (me.profile) {
-      setProfile(me.profile);
+    const own = validProfile(me.profile);
+    if (own) {
+      setProfile(own);
     } else {
-      const local = readStored<FirmProfile | null>("profile", null);
+      const local = validProfile(readStored("profile", null));
       if (local) saveProfile(local).then(setUser).catch(() => undefined);
     }
     loadHistory().then(setHistory).catch(() => undefined);
@@ -112,10 +128,31 @@ export default function App({ initialView = "research" }: { initialView?: View }
   function signedOut() {
     setUser(null);
     setResult(null);
-    setProfile(readStored<FirmProfile | null>("profile", null));
+    setProfile(validProfile(readStored("profile", null)));
     loadHistory().then(setHistory).catch(() => undefined);
     go("research");
   }
+
+  // A 401 on an account call while signed in means the session ended elsewhere (expiry, logout
+  // in another tab): show the person as a guest where they are. A guest's 401 means nothing.
+  const sessionEndedRef = useRef(() => {});
+  sessionEndedRef.current = () => {
+    if (!user) return;
+    setUser(null);
+    setResult(null);
+    setProfile(validProfile(readStored("profile", null)));
+    loadHistory().then(setHistory).catch(() => undefined);
+  };
+  useEffect(() => {
+    setUnauthorizedHandler(() => sessionEndedRef.current());
+    return () => setUnauthorizedHandler(null);
+  }, []);
+
+  /** What to tell the person when a call failed: a translated message for the usual causes. */
+  const describe = useCallback(
+    (e: ApiError) => (e.status === 0 ? t.errorUnreachable : (t.httpErrors[e.status] ?? `${t.errorPrefix} ${e.message}`)),
+    [t],
+  );
 
   useEffect(() => {
     document.documentElement.lang = lang;
@@ -131,6 +168,11 @@ export default function App({ initialView = "research" }: { initialView?: View }
   const chooseModel = (id: string) => {
     setModel(id);
     writeStored("model", id);
+  };
+
+  const chooseStrategy = (s: SearchStrategy) => {
+    setStrategy(s);
+    writeStored("strategy", s);
   };
 
   const applyProfile = (p: FirmProfile | null) => {
@@ -158,10 +200,10 @@ export default function App({ initialView = "research" }: { initialView?: View }
     setTools([]);
     setFound(null);
     setDraft("");
-    setStage("search");
+    setStage("precheck");
     try {
       await askStream(
-        { question, profile, model: model || null },
+        { question, profile, model: model || null, strategy },
         (event) => {
           if (event.stage === "done") {
             setResult(event.result);
@@ -173,8 +215,10 @@ export default function App({ initialView = "research" }: { initialView?: View }
           } else if (event.stage === "delta") {
             setDraft((d) => d + event.text);
           } else if (event.stage === "error") {
-            setError(`${t.errorPrefix} ${event.detail}`);
+            setError(t.httpErrors[event.status] ?? `${t.errorPrefix} ${event.detail}`);
             setStage(null);
+          } else if (event.stage === "refused") {
+            // the result that follows carries the refusal
           } else {
             setStage(event.stage);
             if (event.stage === "writing") setDraft("");
@@ -185,10 +229,20 @@ export default function App({ initialView = "research" }: { initialView?: View }
       );
     } catch (e) {
       const err = e as ApiError;
-      setError(err.status === 0 ? t.errorUnreachable : `${t.errorPrefix} ${err.message}`);
+      if (err.status === 429 && err.retryAfter) {
+        const when = new Date(Date.now() + err.retryAfter * 1000);
+        const locale = lang === "de" ? "de-DE" : "en-GB";
+        if (err.limit === "daily-cost") {
+          setError(t.costCeiling(when.toLocaleString(locale, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })));
+        } else {
+          setError(t.rateLimited(when.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })));
+        }
+      } else {
+        setError(describe(err));
+      }
       setStage(null);
     }
-  }, [question, profile, model, t]);
+  }, [question, profile, model, strategy, t, lang, describe]);
 
   const openStored = async (id: string) => {
     abort.current?.abort();
@@ -200,7 +254,7 @@ export default function App({ initialView = "research" }: { initialView?: View }
       setResult(stored);
       setQuestion(stored.question);
     } catch (e) {
-      setError((e as ApiError).message);
+      setError(describe(e as ApiError));
     }
   };
 
@@ -241,7 +295,7 @@ export default function App({ initialView = "research" }: { initialView?: View }
         view={view}
         onView={go}
         user={user}
-        onSignIn={() => setAuthOpen(true)}
+        onSignIn={() => openAuth("login")}
         onSignOut={signOut}
       />
 
@@ -252,7 +306,8 @@ export default function App({ initialView = "research" }: { initialView?: View }
             lang={lang}
             user={user}
             refreshKey={refreshKey}
-            onSignIn={() => setAuthOpen(true)}
+            onSignIn={() => openAuth("login")}
+            onSignUp={() => openAuth("register")}
             onEditProfile={() => setProfileOpen(true)}
             onOpenAnswer={(id) => {
               go("research");
@@ -262,6 +317,12 @@ export default function App({ initialView = "research" }: { initialView?: View }
             onNewQuestion={() => {
               go("research");
               startNew();
+            }}
+            onAsk={(prepared) => {
+              go("research");
+              startNew();
+              setQuestion(prepared);
+              requestAnimationFrame(() => document.getElementById("question")?.focus());
             }}
             onDeleted={signedOut}
           />
@@ -291,7 +352,16 @@ export default function App({ initialView = "research" }: { initialView?: View }
             models={models}
             model={model}
             onModel={chooseModel}
+            strategies={strategies}
+            strategy={strategy}
+            onStrategy={chooseStrategy}
           />
+
+          {listError && (
+            <p role="alert" className="mt-4 rounded-lg bg-red-soft px-4 py-2.5 text-sm">
+              {t.listUnavailable}
+            </p>
+          )}
 
           {error && (
             <div role="alert" className="mt-4 flex flex-wrap items-center gap-3 rounded-lg bg-red-soft px-4 py-2.5 text-sm">
@@ -315,6 +385,7 @@ export default function App({ initialView = "research" }: { initialView?: View }
                   {t.emptyTitle}
                 </h1>
                 <p className="mt-3 max-w-[62ch] text-ink-2">{t.emptyBody}</p>
+                <p className="mt-2 max-w-[62ch] text-sm text-ink-3">{t.protectionNote}</p>
                 {regimes.length > 0 && (
                   <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
                     <span className="text-ink-2">{t.coverage(sources.length, regimes.length)}</span>
@@ -345,11 +416,23 @@ export default function App({ initialView = "research" }: { initialView?: View }
               </section>
             )}
 
-            {result && (
+            {result && result.refusal && (
+              <section aria-labelledby="refusal-title" className="rounded-xl border border-line bg-panel px-5 py-4">
+                <p className="mb-3 border-b border-line pb-3 text-sm text-ink-2">{result.question}</p>
+                <h2 id="refusal-title" className="text-base font-semibold">
+                  {t.refusalTitle}
+                </h2>
+                <p className="mt-2 max-w-[70ch] text-sm text-ink-2">{t.refusalReasons[result.refusal]}</p>
+                <p className="mt-2 max-w-[70ch] text-sm">{t.refusalHint}</p>
+                <p className="mt-3 text-xs text-ink-3">{t.strategies[result.strategy ?? "vector"]} · {result.model}</p>
+              </section>
+            )}
+
+            {result && !result.refusal && (
               <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,460px)]">
                 <div className="min-w-0">
                   <AnswerView t={t} lang={lang} result={result} active={highlighted} onCite={cite} onHover={setHover} />
-                  {result.id && <Obligations key={result.id} t={t} answerId={result.id} initial={result.obligations ?? null} />}
+                  {result.id && <Obligations key={result.id} t={t} answerId={result.id} initial={result.obligations ?? null} onCite={cite} />}
                   <ToolCards t={t} lang={lang} tools={result.tools} />
                 </div>
                 <div className="min-w-0 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto xl:pr-1 print-full">
@@ -368,7 +451,7 @@ export default function App({ initialView = "research" }: { initialView?: View }
         </p>
       </footer>
 
-      <AuthDialog open={authOpen} t={t} onDone={signedIn} onClose={() => setAuthOpen(false)} />
+      <AuthDialog key={authKey} open={authOpen} t={t} initialMode={authMode} onDone={signedIn} onClose={() => setAuthOpen(false)} />
 
       <ProfileDialog
         open={profileOpen}

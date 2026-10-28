@@ -71,8 +71,8 @@ def test_stream_reports_each_step_then_the_result():
         "POST", "/api/ask/stream", json={"question": "Does DORA apply?"}
     ) as r:
         events = [json.loads(line[6:]) for line in r.iter_lines() if line.startswith("data: ")]
-    assert [e["stage"] for e in events] == ["search", "found", "model", "done"]
-    assert events[1]["count"] == 1 and events[1]["sources"] == ["DORA"]
+    assert [e["stage"] for e in events] == ["precheck", "search", "found", "model", "done"]
+    assert events[2]["count"] == 1 and events[2]["sources"] == ["DORA"]  # the "found" event
     result = AskResponse.model_validate(events[-1]["result"])
     assert result.coverage == "full" and result.cited == [1]
 
@@ -107,7 +107,7 @@ def test_streamed_answer_reports_writing_and_text_as_it_arrives():
         "Does DORA apply?", on_stage=lambda stage, data: stages.append((stage, data.get("text")))
     )
     names = [s for s, _ in stages]
-    assert names[:3] == ["search", "found", "model"] and names[3] == "writing"
+    assert names[:4] == ["precheck", "search", "found", "model"] and names[4] == "writing"
     assert "".join(t for s, t in stages if s == "delta") == "DORA applies [1].\nCoverage: full"
     assert response.answer == "DORA applies [1]." and response.coverage == "full"
 
@@ -118,3 +118,37 @@ def test_cost_is_computed_from_list_prices_when_not_reported():
         usage_metadata={"input_tokens": 1000, "output_tokens": 100, "total_tokens": 1100},
     )
     assert _usage(a, prices=(1e-7, 5e-7)).cost_usd == 0.00015
+
+
+def test_coverage_line_is_recognised_in_its_bold_label_form():
+    assert split_coverage("Answer [1].\n\n**Coverage:** partial") == ("Answer [1].", "partial")
+    assert split_coverage("Answer.\n\n**Coverage: full**") == ("Answer.", "full")
+
+
+def test_refused_record_exports_its_reason_instead_of_an_empty_answer():
+    from datetime import UTC, datetime
+
+    from compliance_advisor.audit import to_markdown
+
+    record = {
+        "id": "r1",
+        "created_at": datetime(2026, 10, 28, tzinfo=UTC),
+        "model": "m",
+        "profile": None,
+        "source_versions": {},
+        "response": {
+            "question": "Rezept?",
+            "answer": "",
+            "passages": [],
+            "cited": [],
+            "tools": [],
+            "redactions": [],
+            "usage": {"input_tokens": 1, "output_tokens": 1, "cost_usd": 0.0},
+            "model": "m",
+            "strategy": "vector",
+            "disclaimer": "Not legal advice.",
+            "refusal": "off_topic",
+        },
+    }
+    text = to_markdown(record)
+    assert "## Refused" in text and "off_topic" in text and "## Answer" not in text

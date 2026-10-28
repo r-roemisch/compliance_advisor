@@ -1,6 +1,8 @@
 # Compliance Advisor for Financial Services: the target picture
 
 > **Not legal advice.** This project gives general regulatory information only. It does not replace consultation with a qualified lawyer or the firm's own compliance function.
+
+> **Snapshot of 2026-10-20, kept for re-reading.** Two things turned out differently: nothing was carried over from the Founder Legal Guide (the working agreement in `docs/ROADMAP.md` is that no code, docs or wording are reused), and hybrid search was measured on 2026-10-28 and lost to vector search (`docs/EVALUATION.md`), so it is offered as a choice, not the default.
 '''
 my own notes:
 Advisor-facing tool for client suitability and trade pre-clearance

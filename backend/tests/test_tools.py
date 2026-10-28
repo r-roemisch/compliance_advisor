@@ -183,7 +183,7 @@ class ScriptedModel:
 
 
 class OnePassage:
-    def retrieve(self, question, k):
+    def retrieve(self, question, k, strategy="vector"):
         meta = {
             "passage_id": "p1",
             "source_id": "eu-dora",

@@ -109,7 +109,7 @@ function Incident({ r, t, lang }: { r: Record<string, unknown>; t: Strings; lang
             </span>
             <span>
               <span className="font-medium">{CRITERIA[c.criterion]?.[lang] ?? c.criterion}</span>
-              <span className="sr-only">{c.met ? " met" : c.met === false ? " not met" : " unknown"}</span>
+              <span className="sr-only">{c.met ? t.criterionMet : c.met === false ? t.criterionNotMet : t.criterionUnknown}</span>
               <span className="block text-xs text-ink-2">{c.detail}</span>
             </span>
           </li>

@@ -75,7 +75,7 @@ export function PassageList(props: {
                     <span className="inline-flex items-center gap-1.5">
                       <LayerGlyph layer={p.layer} lang={lang} size={14} />
                       {layerName(p.layer, lang)}
-                      {!isBinding(p.layer) && <span className="text-ink-3">({lang === "de" ? "Aufsichtserwartung" : "supervisory expectation"})</span>}
+                      {!isBinding(p.layer) && <span className="text-ink-3">({t.supervisoryExpectation})</span>}
                     </span>
                     <span>{p.issuer}</span>
                     {later ? (

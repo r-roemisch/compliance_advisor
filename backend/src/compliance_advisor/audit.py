@@ -5,7 +5,20 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
-from sqlalchemy import Column, DateTime, MetaData, String, Table, Text, select, text, update
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Float,
+    MetaData,
+    String,
+    Table,
+    Text,
+    func,
+    literal_column,
+    select,
+    text,
+    update,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.engine import Engine
 
@@ -24,6 +37,8 @@ answers = Table(
     Column("source_versions", JSONB, nullable=False),
     Column("obligations", JSONB),  # rows from "Extract Obligations", if run
     Column("user_id", String(36), index=True),  # the account that asked; empty for guests
+    Column("api_key", String(100)),  # the name of the API key used, if any
+    Column("obligations_cost", Float),  # what "Extract Obligations" cost, if run
 )
 
 
@@ -34,6 +49,8 @@ def source_versions(raw_dir: Path, source_ids: set[str]) -> dict[str, dict]:
         try:
             meta = json.loads((raw_dir / source_id / "meta.json").read_text())
             versions[source_id] = {"fetched_at": meta["fetched_at"], "sha256": meta["sha256"]}
+            if meta.get("text_sha256"):
+                versions[source_id]["text_sha256"] = meta["text_sha256"]
         except (OSError, ValueError, KeyError):
             versions[source_id] = {}
     return versions
@@ -58,9 +75,19 @@ class AuditStore:
             connection.execute(
                 text("create index if not exists ix_answers_user_id on answers (user_id)")
             )
+            connection.execute(
+                text("alter table answers add column if not exists api_key varchar(100)")
+            )
+            connection.execute(
+                text("alter table answers add column if not exists obligations_cost float")
+            )
 
     def save(
-        self, response: AskResponse, profile: dict | None, user_id: str | None = None
+        self,
+        response: AskResponse,
+        profile: dict | None,
+        user_id: str | None = None,
+        api_key: str | None = None,
     ) -> AskResponse:
         response = response.model_copy(
             update={"id": str(uuid.uuid4()), "created_at": datetime.now(UTC)}
@@ -77,14 +104,31 @@ class AuditStore:
                     response=json.loads(response.model_dump_json()),
                     source_versions=versions,
                     user_id=user_id,
+                    api_key=api_key,
                 )
             )
         return response
 
-    def save_obligations(self, answer_id: str, rows: list[dict]) -> None:
+    def cost_since(self, since: datetime) -> float:
+        """What every answer since `since` cost, from the usage stored with each one."""
+        query = select(
+            func.coalesce(
+                func.sum(
+                    answers.c.response["usage"]["cost_usd"].as_float()
+                    + func.coalesce(answers.c.obligations_cost, 0.0)
+                ),
+                0.0,
+            )
+        ).where(answers.c.created_at >= since)
+        with self.engine.connect() as connection:
+            return float(connection.execute(query).scalar_one())
+
+    def save_obligations(self, answer_id: str, rows: list[dict], cost_usd: float = 0.0) -> None:
         with self.engine.begin() as connection:
             connection.execute(
-                update(answers).where(answers.c.id == answer_id).values(obligations=rows)
+                update(answers)
+                .where(answers.c.id == answer_id)
+                .values(obligations=rows, obligations_cost=cost_usd)
             )
 
     @staticmethod
@@ -99,6 +143,8 @@ class AuditStore:
             answers.c.question,
             answers.c.model,
             (answers.c.obligations.isnot(None)).label("has_obligations"),
+            (answers.c.response["refusal"].astext.isnot(None)).label("refused"),
+            answers.c.api_key,
         ).where(self._owned_by(user_id))
         if search.strip():
             query = query.where(answers.c.question.ilike(f"%{search.strip()}%"))
@@ -107,15 +153,20 @@ class AuditStore:
             return [dict(row._mapping) for row in connection.execute(query)]
 
     def records(self, user_id: str, search: str = "") -> list[dict]:
-        """One row per stored answer of an account, with what the dashboard summarises."""
+        """One row per stored answer of an account, newest first, with what the dashboard
+        summarises (see analytics.py)."""
         query = select(
             answers.c.id,
             answers.c.created_at,
             answers.c.question,
             answers.c.model,
-            answers.c.response["passages"].label("passages"),
+            literal_column(  # every Passage field but the text, which the dashboard never shows
+                "(select coalesce(jsonb_agg(p - 'text'), '[]'::jsonb) "
+                "from jsonb_array_elements(answers.response->'passages') p)"
+            ).label("passages"),
             answers.c.response["cited"].label("cited"),
             answers.c.response["tools"].label("tools"),
+            answers.c.response["refusal"].astext.label("refusal"),
             answers.c.obligations,
         ).where(self._owned_by(user_id))
         if search.strip():
@@ -133,6 +184,7 @@ class AuditStore:
                     "created_at": r.created_at,
                     "question": r.question,
                     "model": r.model,
+                    "refused": r.refusal is not None,
                     "regimes": list(
                         dict.fromkeys(
                             [
@@ -145,9 +197,38 @@ class AuditStore:
                     ),
                     "tools": list(dict.fromkeys(t.get("name") for t in (r.tools or []))),
                     "obligations": r.obligations or [],
+                    # Cited Provisions only, for "most cited"; touched Sources, for Blind Spots.
+                    "provisions": [
+                        {
+                            "provision": p["provision"],
+                            "title": p.get("provision_title", ""),
+                            "short_title": p.get("short_title", ""),
+                            "layer": p.get("layer", ""),
+                            "link": p.get("link") or p.get("url", ""),
+                        }
+                        for p in passages
+                        if p.get("n") in cited and p.get("provision")
+                    ],
+                    "sources": list(
+                        dict.fromkeys(p["short_title"] for p in used if p.get("short_title"))
+                    ),
                 }
             )
         return result
+
+    def versions_used(self, user_id: str) -> dict[str, dict]:
+        """Per Source, the checksums the account's answers were stored with and how many answers
+        used each; the dashboard compares them with the current copy."""
+        query = select(answers.c.source_versions).where(self._owned_by(user_id))
+        used: dict[str, dict] = {}
+        with self.engine.connect() as connection:
+            for (versions,) in connection.execute(query):
+                for source_id, version in (versions or {}).items():
+                    if version.get("sha256"):
+                        entry = used.setdefault(source_id, {"versions": [], "answers": 0})
+                        entry["versions"].append(version)
+                        entry["answers"] += 1
+        return used
 
     def get(self, answer_id: str) -> dict | None:
         with self.engine.connect() as connection:
@@ -173,7 +254,20 @@ def to_markdown(record: dict) -> str:
         )
     if r.get("redactions"):
         lines.append(f"- Removed by the pre-check: {', '.join(r['redactions'])}")
-    lines += ["", "## Question", "", r["question"], "", "## Answer", "", r["answer"], ""]
+    if r.get("refusal"):
+        lines += [
+            "",
+            "## Question",
+            "",
+            r["question"],
+            "",
+            "## Refused",
+            "",
+            f"The Pre-Check refused this question ({r['refusal']}): no answer, no Passages.",
+            "",
+        ]
+    else:
+        lines += ["", "## Question", "", r["question"], "", "## Answer", "", r["answer"], ""]
     if r.get("tools"):
         lines += ["## Rule checks", ""]
         for t in r["tools"]:

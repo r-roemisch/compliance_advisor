@@ -1,10 +1,35 @@
-"""Retriever: question in, the most similar Passages out (cosine similarity in pgvector)."""
+"""Retriever: question in, the most relevant Passages out. Two Search Strategies: vector search
+(cosine similarity in pgvector) and hybrid search (vector search merged with keyword search)."""
 
 import re
 from dataclasses import dataclass
 
 from langchain_core.documents import Document
 from langchain_postgres import PGVector
+from sqlalchemy import text
+
+SEARCH_STRATEGIES = ("vector", "hybrid")
+RRF_K = 60  # the usual constant of reciprocal rank fusion; damps the weight of the very top ranks
+
+# The question's words are joined with OR ("|"), so a Passage needs only some of them; ts_rank
+# with normalisation 1 keeps long Passages from winning just by holding more words. The question
+# is stemmed in both languages, and each Passage is matched in its own.
+KEYWORD_SQL = text(
+    """
+    WITH q AS (
+        SELECT to_tsquery('german', replace(plainto_tsquery('german', :question)::text, ' & ', ' | ')) AS de,
+               to_tsquery('english', replace(plainto_tsquery('english', :question)::text, ' & ', ' | ')) AS en
+    )
+    SELECT e.document, e.cmetadata, e.embedding <=> CAST(:vector AS vector) AS distance
+    FROM langchain_pg_embedding e, q
+    WHERE e.collection_id = :collection
+      AND (CAST(:only AS text[]) IS NULL OR e.cmetadata->>'passage_id' = ANY(CAST(:only AS text[])))
+      AND ((e.cmetadata->>'language' = 'de' AND e.keywords @@ q.de)
+        OR (e.cmetadata->>'language' <> 'de' AND e.keywords @@ q.en))
+    ORDER BY ts_rank(e.keywords, CASE WHEN e.cmetadata->>'language' = 'de' THEN q.de ELSE q.en END, 1) DESC
+    LIMIT :k
+    """
+)
 
 
 @dataclass
@@ -35,10 +60,28 @@ def named_provisions(question: str, short_titles: list[str]) -> list[str]:
     return labels
 
 
+def merge_ranked(
+    *rankings: list[RetrievedPassage], weights: tuple[float, ...] | None = None
+) -> list[RetrievedPassage]:
+    """Reciprocal rank fusion: every list adds weight / (60 + rank) for each Passage it holds, so
+    a Passage that both searches found rises to the top. The shown score stays the cosine
+    similarity, because keyword ranks and cosine scores are not on one scale."""
+    weights = weights or (1.0,) * len(rankings)
+    fused: dict[str, float] = {}
+    first: dict[str, RetrievedPassage] = {}
+    for ranking, weight in zip(rankings, weights, strict=True):
+        for rank, hit in enumerate(ranking, start=1):
+            passage_id = hit.document.metadata["passage_id"]
+            fused[passage_id] = fused.get(passage_id, 0.0) + weight / (RRF_K + rank)
+            first.setdefault(passage_id, hit)
+    return sorted(first.values(), key=lambda hit: -fused[hit.document.metadata["passage_id"]])
+
+
 class Retriever:
-    """Top-k by cosine similarity, with at most `max_per_source` Passages from one Source, so
-    one closely related act cannot fill every slot (0 switches the cap off). Provisions the
-    question names explicitly ("§ 25a KWG") are looked up directly and come first."""
+    """Top-k by cosine similarity, or with hybrid search the vector and keyword results merged,
+    with at most `max_per_source` Passages from one Source, so one closely related act cannot
+    fill every slot (0 switches the cap off). Provisions the question names explicitly
+    ("§ 25a KWG") are looked up directly and come first."""
 
     def __init__(
         self,
@@ -46,26 +89,118 @@ class Retriever:
         max_per_source: int = 0,
         candidates: int = 24,
         short_titles: list[str] | None = None,
+        keyword_scope: str = "corpus",
+        keyword_weight: float = 1.0,
     ):
+        """For hybrid search, `keyword_scope` "corpus" lets keyword search bring in any Passage,
+        "candidates" only re-sorts the Passages vector search found; `keyword_weight` is the
+        weight of the keyword ranks against the vector ranks."""
         self.store = store
         self.max_per_source = max_per_source
         self.candidates = candidates
         self.short_titles = short_titles or []
+        self.keyword_scope = keyword_scope
+        self.keyword_weight = keyword_weight
 
-    def _search(self, question: str, k: int, filter: dict | None = None) -> list[RetrievedPassage]:
-        hits = self.store.similarity_search_with_score(question, k=k, filter=filter)
+    def _search(
+        self, vector: list[float], k: int, filter: dict | None = None
+    ) -> list[RetrievedPassage]:
+        hits = self.store.similarity_search_with_score_by_vector(vector, k=k, filter=filter)
         # pgvector returns the cosine distance; similarity = 1 - distance.
         return [RetrievedPassage(doc, round(1.0 - distance, 4)) for doc, distance in hits]
 
-    def retrieve(self, question: str, k: int) -> list[RetrievedPassage]:
+    def _keyword_search(
+        self, question: str, vector: list[float], k: int, only: list[str] | None = None
+    ) -> list[RetrievedPassage]:
+        with self.store.session_maker() as session:
+            collection = self.store.get_collection(session)
+            if collection is None:
+                return []
+            rows = session.execute(
+                KEYWORD_SQL,
+                {
+                    "question": question,
+                    "vector": str(vector),
+                    "collection": collection.uuid,
+                    "k": k,
+                    "only": only,
+                },
+            ).all()
+        return [
+            RetrievedPassage(
+                Document(page_content=document, metadata=metadata), round(1.0 - distance, 4)
+            )
+            for document, metadata, distance in rows
+        ]
+
+    def retrieve(self, question: str, k: int, strategy: str = "vector") -> list[RetrievedPassage]:
+        return self.search(question, k, strategy)[0]
+
+    def search(
+        self, question: str, k: int, strategy: str = "vector"
+    ) -> tuple[list[RetrievedPassage], dict]:
+        """The Passages, and the Answer Trace of how they were found (schemas.Trace)."""
+        if strategy not in SEARCH_STRATEGIES:
+            raise ValueError(f"unknown search strategy {strategy!r}")
+        vector = self.store.embeddings.embed_query(question)  # once, for every search below
+        labels = named_provisions(question, self.short_titles)[:3]
         named: list[RetrievedPassage] = []
-        for label in named_provisions(question, self.short_titles)[:3]:
-            named += self._search(question, 2, filter={"provision": {"$eq": label}})
-        fetch = max(k, self.candidates) if self.max_per_source else k
-        ranked = cap_per_source(self._search(question, fetch), k, self.max_per_source)
-        seen = {hit.document.metadata["passage_id"] for hit in named}
-        rest = [hit for hit in ranked if hit.document.metadata["passage_id"] not in seen]
-        return (named[: k // 2] + rest)[:k]
+        for label in labels:
+            named += self._search(vector, 2, filter={"provision": {"$eq": label}})
+        hybrid = strategy == "hybrid"
+        fetch = max(k, self.candidates) if self.max_per_source or hybrid else k
+        by_vector = self._search(vector, fetch)
+        ranked, keyword = by_vector, []
+        if hybrid:
+            only = None
+            if self.keyword_scope == "candidates":
+                only = [hit.document.metadata["passage_id"] for hit in by_vector]
+            keyword = self._keyword_search(question, vector, fetch, only)
+            ranked = merge_ranked(by_vector, keyword, weights=(1.0, self.keyword_weight))
+        capped = cap_per_source(ranked, k, self.max_per_source)
+        kept = named[: k // 2]  # named Provisions take at most half the slots
+        seen = {hit.document.metadata["passage_id"] for hit in kept}
+        rest = [hit for hit in capped if hit.document.metadata["passage_id"] not in seen]
+        final = (kept + rest)[:k]
+
+        def ids(hits: list[RetrievedPassage]) -> list[str]:
+            return [hit.document.metadata["passage_id"] for hit in hits]
+
+        in_vector, in_keyword = set(ids(by_vector)), set(ids(keyword))
+        trace = {
+            "strategy": strategy,
+            "named": labels,
+            "named_hits": [_trace_hit(h) for h in named],
+            "vector": [_trace_hit(h) for h in by_vector],
+            "keyword": [_trace_hit(h, rank=n) for n, h in enumerate(keyword, start=1)],
+            "merged": ids(ranked) if hybrid else [],
+            "max_per_source": self.max_per_source,
+            "capped_out": sum(1 for h in ranked[:k] if h not in capped),
+            "found_by": {
+                pid: (
+                    "named"
+                    if pid in seen
+                    else "both"
+                    if pid in in_vector and pid in in_keyword
+                    else "keyword"
+                    if pid in in_keyword
+                    else "vector"
+                )
+                for pid in ids(final)
+            },
+        }
+        return final, trace
+
+
+def _trace_hit(hit: RetrievedPassage, rank: int | None = None) -> dict:
+    meta = hit.document.metadata
+    return {
+        "passage_id": meta["passage_id"],
+        "provision": meta.get("provision", ""),
+        "short_title": meta.get("short_title", ""),
+        "score": hit.score,
+        "rank": rank,
+    }
 
 
 def cap_per_source(
@@ -89,4 +224,5 @@ def cap_per_source(
         if len(chosen) == k:
             return chosen
     chosen += held_back[: k - len(chosen)]
-    return sorted(chosen, key=lambda hit: -hit.score)
+    position = {id(hit): n for n, hit in enumerate(ranked)}
+    return sorted(chosen, key=lambda hit: position[id(hit)])  # merged order, not only by score

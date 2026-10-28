@@ -14,6 +14,7 @@ from .chunker import chunk
 from .loaders import load
 from .registry import load_sources, select
 from .settings import get_settings
+from .update import record_text_fingerprint
 
 
 def main() -> None:
@@ -63,7 +64,7 @@ def main() -> None:
             label = sample.metadata.get("provision", "")
             print(f"{source.id}: {summary}\n    sample {label}: {sample.page_content[:240]!r}")
             continue
-        from .store import add_passages, delete_source
+        from .store import replace_source
 
         started = time.monotonic()
         try:
@@ -78,8 +79,11 @@ def main() -> None:
             failures += 1
             print(f"{source.id}: embedding failed, old Passages kept: {e}")
             continue
-        removed = delete_source(store, source.id)
-        add_passages(store, passages, vectors)
+        removed = replace_source(store, source.id, passages, vectors)  # one transaction
+        if settings.chunker == "provision":  # the naive baseline must not pose as the Corpus
+            record_text_fingerprint(
+                settings.raw_dir, source.id, [p.metadata["passage_id"] for p in passages]
+            )
         print(
             f"{source.id}: {summary}; removed {removed} old, stored {len(passages)} "
             f"in {time.monotonic() - started:.1f}s"

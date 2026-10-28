@@ -8,6 +8,7 @@ import argparse
 import hashlib
 import json
 from datetime import UTC, datetime
+from pathlib import Path
 from urllib.parse import urlsplit
 from urllib.robotparser import RobotFileParser
 
@@ -71,11 +72,8 @@ def check_content(source: Source, body: bytes) -> None:
         raise FetchRefused("expected HTML, got something else")
 
 
-def fetch_one(client: httpx.Client, source: Source, refresh: bool, robots_cache: dict) -> str:
-    target_dir = get_settings().raw_dir / source.id
-    target = target_dir / FILE_NAMES[source.format]
-    if target.exists() and not refresh:
-        return f"skipped, already there ({target.stat().st_size:,} bytes); use --refresh to download again"
+def download(client: httpx.Client, source: Source, robots_cache: dict) -> tuple[bytes, dict]:
+    """Downloads a Source and returns its content and meta record without writing anything."""
     if not robots_allows(client, source.url, robots_cache):
         raise FetchRefused("robots.txt disallows automated access to this address")
     response = client.get(
@@ -88,8 +86,6 @@ def fetch_one(client: httpx.Client, source: Source, refresh: bool, robots_cache:
     if response.status_code != 200:
         raise FetchRefused(f"the server answered {response.status_code}")
     check_content(source, response.content)
-    target_dir.mkdir(parents=True, exist_ok=True)
-    target.write_bytes(response.content)
     meta = {
         "id": source.id,
         "url": source.url,
@@ -99,8 +95,34 @@ def fetch_one(client: httpx.Client, source: Source, refresh: bool, robots_cache:
         "sha256": hashlib.sha256(response.content).hexdigest(),
         "fetched_at": datetime.now(UTC).isoformat(timespec="seconds"),
     }
-    (target_dir / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
-    return f"saved {target.relative_to(get_settings().data_dir.parent)} ({len(response.content):,} bytes)"
+    return response.content, meta
+
+
+def fetch_one(client: httpx.Client, source: Source, refresh: bool, robots_cache: dict) -> str:
+    target_dir = get_settings().raw_dir / source.id
+    target = target_dir / FILE_NAMES[source.format]
+    if target.exists() and not refresh:
+        return f"skipped, already there ({target.stat().st_size:,} bytes); use --refresh to download again"
+    content, meta = download(client, source, robots_cache)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(content)
+    save_meta(target_dir, meta)
+    return f"saved {target.relative_to(get_settings().data_dir.parent)} ({len(content):,} bytes)"
+
+
+def save_meta(target_dir: Path, meta: dict, text_sha256: str | None = None) -> None:
+    """Writes meta.json, keeping the text fingerprint an earlier ingest or Update Run recorded
+    unless a new one is given: a fresh download must not make a Source look changed."""
+    path = target_dir / "meta.json"
+    if text_sha256 is None:
+        try:
+            text_sha256 = json.loads(path.read_text()).get("text_sha256")
+        except (OSError, ValueError):
+            text_sha256 = None
+    if text_sha256:
+        meta = {**meta, "text_sha256": text_sha256}
+    target_dir.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
 
 def main() -> None:

@@ -1,5 +1,6 @@
 """Answer Models offered in the interface (config/models.yaml), reached through OpenRouter."""
 
+from functools import lru_cache
 from pathlib import Path
 
 import httpx
@@ -19,6 +20,12 @@ class ModelOption(BaseModel, extra="forbid"):
 
 
 def load_models(path: Path) -> list[ModelOption]:
+    """config/models.yaml, parsed once per file version."""
+    return _load_models(path, path.stat().st_mtime_ns)
+
+
+@lru_cache(maxsize=4)
+def _load_models(path: Path, version: int) -> list[ModelOption]:
     entries = (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).get("models") or []
     models = [ModelOption.model_validate(e) for e in entries]
     if not models:

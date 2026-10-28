@@ -1,10 +1,24 @@
-import type { AskResponse, DashboardData, FirmProfile, HistoryItem, InventoryRow, ModelOption, ObligationRow, Preset, QuestionRow, SourceInfo, StreamEvent, TimelineEntry, User } from "./types";
+import type { ApiKey, AskResponse, DashboardData, OperatorData, SourceChange, UpdateRuns, FirmProfile, HistoryItem, InventoryRow, ModelOption, ObligationRow, Period, Preset, QuestionFilter, QuestionRow, SearchStrategy, SourceInfo, StreamEvent, TimelineEntry, User } from "./types";
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(
+    public status: number,
+    message: string,
+    public retryAfter: number | null = null, // seconds, from a 429's Retry-After header
+    public limit: string | null = null, // "questions" or "daily-cost", from a 429's X-Limit header
+  ) {
     super(message);
   }
 }
+
+/** Called when the backend answers 401 to an account call: the session has ended elsewhere. */
+let onUnauthorized: (() => void) | null = null;
+export const setUnauthorizedHandler = (handler: (() => void) | null) => {
+  onUnauthorized = handler;
+};
+const noteUnauthorized = (path: string, status: number) => {
+  if (status === 401 && path.startsWith("/api/me")) onUnauthorized?.();
+};
 
 async function getJson<T>(path: string): Promise<T> {
   let response: Response;
@@ -15,6 +29,7 @@ async function getJson<T>(path: string): Promise<T> {
   }
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
+    noteUnauthorized(path, response.status);
     throw new ApiError(response.status, typeof body.detail === "string" ? body.detail : `HTTP ${response.status}`);
   }
   return response.json();
@@ -22,14 +37,15 @@ async function getJson<T>(path: string): Promise<T> {
 
 export const loadSources = () => getJson<{ sources: SourceInfo[] }>("/api/sources").then((d) => d.sources);
 export const loadPresets = () => getJson<{ presets: Preset[] }>("/api/profiles").then((d) => d.presets);
-export const loadModels = () => getJson<{ models: ModelOption[] }>("/api/models").then((d) => d.models);
+export const loadModels = () =>
+  getJson<{ models: ModelOption[]; strategies: SearchStrategy[]; default_strategy: SearchStrategy }>("/api/models");
 export const loadHistory = (search = "") =>
   getJson<{ items: HistoryItem[] }>(`/api/history?limit=200&q=${encodeURIComponent(search)}`).then((d) => d.items);
 export const loadAnswer = (id: string) =>
-  getJson<{ response: AskResponse; obligations: ObligationRow[] | null }>(`/api/history/${id}`).then((d) => ({
+  getJson<{ response: AskResponse; obligations: ObligationRow[] | null; changed_sources?: SourceChange[] }>(`/api/history/${id}`).then((d) => ({
     ...d.response,
-    id,
     obligations: d.obligations,
+    changed_sources: d.changed_sources ?? [],
   }));
 
 async function postJson<T>(path: string, body: unknown): Promise<T> {
@@ -41,20 +57,21 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
   }
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
+    noteUnauthorized(path, response.status);
     throw new ApiError(response.status, typeof data.detail === "string" ? data.detail : `HTTP ${response.status}`);
   }
   return response.json();
 }
 
 export const extractObligations = (id: string) =>
-  postJson<{ rows: ObligationRow[] }>(`/api/history/${id}/obligations`, {}).then((d) => d.rows);
+  postJson<{ rows: ObligationRow[]; cost_usd: number }>(`/api/history/${id}/obligations`, {});
 export const loadTimeline = (profile: FirmProfile | null, upcomingOnly: boolean) =>
   postJson<{ entries: TimelineEntry[] }>("/api/timeline", { profile, upcoming_only: upcomingOnly }).then((d) => d.entries);
 export const exportUrl = (id: string, format: "md" | "json") => `/api/history/${id}/export?format=${format}`;
 
 /** Asks a question and reports each step as server-sent events arrive. */
 export async function askStream(
-  body: { question: string; profile: FirmProfile | null; model: string | null },
+  body: { question: string; profile: FirmProfile | null; model: string | null; strategy: SearchStrategy | null },
   onEvent: (event: StreamEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> {
@@ -72,7 +89,13 @@ export async function askStream(
   }
   if (!response.ok || !response.body) {
     const data = await response.json().catch(() => ({}));
-    throw new ApiError(response.status, typeof data.detail === "string" ? data.detail : `HTTP ${response.status}`);
+    const retryAfter = Number(response.headers.get("retry-after"));
+    throw new ApiError(
+      response.status,
+      typeof data.detail === "string" ? data.detail : `HTTP ${response.status}`,
+      Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : null,
+      response.headers.get("x-limit"),
+    );
   }
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -104,6 +127,7 @@ async function send<T>(method: string, path: string, body?: unknown): Promise<T>
   }
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
+    noteUnauthorized(path, response.status);
     throw new ApiError(response.status, typeof data.detail === "string" ? data.detail : `HTTP ${response.status}`);
   }
   return response.json();
@@ -118,8 +142,18 @@ export const login = (email: string, password: string) =>
 export const logout = () => send<{ user: null }>("POST", "/api/auth/logout");
 export const saveProfile = (profile: FirmProfile | null) =>
   send<{ user: User }>("PUT", "/api/me/profile", { profile }).then((d) => d.user);
-export const loadDashboard = () => getJson<DashboardData>("/api/me/dashboard");
+export const loadDashboard = (days: Period) => getJson<DashboardData>(`/api/me/dashboard?days=${days}`);
 export const deleteAccount = () => send<{ deleted: boolean; answers_removed: number }>("DELETE", "/api/me");
-export const loadMyQuestions = (search = "") =>
-  getJson<{ items: QuestionRow[] }>(`/api/me/questions?q=${encodeURIComponent(search)}`).then((d) => d.items);
+export const loadMyQuestions = (search = "", filter: QuestionFilter = {}) => {
+  const params = new URLSearchParams({ q: search });
+  for (const [key, value] of Object.entries(filter)) if (value !== undefined && value !== "") params.set(key, String(value));
+  return getJson<{ items: QuestionRow[] }>(`/api/me/questions?${params}`).then((d) => d.items);
+};
+export const loadOperatorOverview = (days: Period) => getJson<OperatorData>(`/api/operator/overview?days=${days}`);
+export const loadUpdateRuns = () => getJson<UpdateRuns>("/api/operator/update-runs");
+export const startUpdateRun = () => send<{ started: boolean }>("POST", "/api/operator/update-runs");
+export const loadMyChanges = () => getJson<{ changes: SourceChange[] }>("/api/me/changes").then((d) => d.changes);
+export const loadKeys = () => getJson<{ keys: ApiKey[] }>("/api/me/keys").then((d) => d.keys);
+export const createKey = (name: string) => send<{ key: ApiKey; secret: string }>("POST", "/api/me/keys", { name });
+export const revokeKey = (id: string) => send<{ revoked: boolean }>("DELETE", `/api/me/keys/${id}`);
 export const loadMyObligations = () => getJson<{ rows: InventoryRow[] }>("/api/me/obligations").then((d) => d.rows);

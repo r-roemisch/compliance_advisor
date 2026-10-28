@@ -1,6 +1,7 @@
 """The Source Registry: reads and validates config/sources.yaml."""
 
 from datetime import date
+from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
@@ -41,6 +42,12 @@ class Source(BaseModel, extra="forbid"):
 
 
 def load_sources(path: Path) -> list[Source]:
+    """The Source Registry, parsed once per file version (it is read on every question)."""
+    return _load_sources(path, path.stat().st_mtime_ns)
+
+
+@lru_cache(maxsize=4)
+def _load_sources(path: Path, version: int) -> list[Source]:
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     entries = raw.get("sources") or []
     sources, problems = [], []

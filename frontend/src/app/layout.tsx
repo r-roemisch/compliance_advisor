@@ -10,7 +10,7 @@ const plexCond = IBM_Plex_Sans_Condensed({ subsets: ["latin"], weight: ["500", "
 export const metadata: Metadata = {
   title: "Compliance Advisor",
   description:
-    "Regulatory research for compliance teams at banks and insurers supervised in Germany. Not legal advice.",
+    "Regulatory research for Compliance Officers at banks and insurers supervised in Germany. Not legal advice.",
 };
 
 // Applies the stored theme before the first paint, so dark mode does not flash.

@@ -1,0 +1,22 @@
+# Rate limits: how many questions may be asked, and a daily cost ceiling for the whole app.
+#
+# Not legal advice: the Compliance Advisor gives general regulatory information only.
+#
+#   guest_per_hour     questions per hour per guest browser (a signed cookie the backend sets);
+#                      requests without a valid cookie share one bucket per address
+#   account_per_hour   questions per hour per Account (an API key shares its Account's budget)
+#   account_per_day    questions per day per Account
+#   registrations_per_hour   new accounts per hour per address (behind the Next.js proxy, for all)
+#   login_attempts_per_hour  login attempts per hour per email address, right or wrong
+#   daily_cost_usd     when the day's answers have cost this much in total, nobody can ask until
+#                      the next day (UTC); a safety net against runaway use
+#
+# Counters per Account, guest browser or address live in the backend's memory and start again
+# with it; the daily cost comes from the audit trail.
+
+guest_per_hour: 10
+account_per_hour: 30
+account_per_day: 200
+registrations_per_hour: 5
+login_attempts_per_hour: 10
+daily_cost_usd: 5.0

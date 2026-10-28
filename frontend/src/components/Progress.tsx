@@ -33,12 +33,13 @@ export function Progress({
   }, []);
 
   const steps: { id: Stage; label: string }[] = [
+    { id: "precheck", label: t.stagePrecheck },
     { id: "search", label: t.stageSearch },
     { id: "model", label: t.stageModel },
-    ...(tools.length || stage === "tools" || stage === "writing" ? [{ id: "tools" as Stage, label: t.stageTools }] : []),
+    ...(tools.length || stage === "tools" ? [{ id: "tools" as Stage, label: t.stageTools }] : []),
     { id: "writing", label: t.stageWriting },
   ];
-  const order: Stage[] = ["search", "model", "tools", "writing"];
+  const order: Stage[] = ["precheck", "search", "model", "tools", "writing"];
   const position = order.indexOf(stage);
 
   return (

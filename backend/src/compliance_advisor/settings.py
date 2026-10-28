@@ -21,7 +21,21 @@ class Settings(BaseSettings):
     # At most this many Passages from one Source; 0 = no cap. Off since 2026-10-23: the evaluation
     # (docs/EVALUATION.md) showed the cap costs hits; the direct lookup of named Provisions stays.
     max_per_source: int = 0
-    candidates: int = 24  # Passages fetched before the cap is applied
+    candidates: int = 24  # Passages fetched before the cap is applied, and per search for hybrid
+    # Search Strategy when the question does not choose one: vector | hybrid. The better one on the
+    # Golden Set (docs/EVALUATION.md).
+    search_strategy: str = "vector"
+    # The Pre-Check's screening (ADR 0007): on by default; the model that screens unless the
+    # chosen Answer Model is EU-hosted, which then screens itself.
+    screening: bool = True
+    screening_model: str = "openai/gpt-6-luna"
+    log_format: str = "json"  # json (one object per line) | text
+    # Update Runs: a nightly check of every Source for a new version, inside the backend.
+    update_runs: bool = False
+    update_hour: int = 3  # UTC
+    # Weight of the keyword ranks in hybrid search. 0.5 beat 1.0 and re-sorting only the vector
+    # candidates on the tuning half of the Golden Set; vector search still did better (2026-10-28).
+    keyword_weight: float = 0.5
     chunker: str = "provision"  # provision | fixed (the naive baseline)
     chunk_size: int = 1000  # fixed chunker
     chunk_overlap: int = 150  # fixed chunker
@@ -29,6 +43,9 @@ class Settings(BaseSettings):
     provision_overlap: int = 200
     api_host: str = "127.0.0.1"
     cookie_secure: bool = False  # set true when served over HTTPS
+    # Only behind a reverse proxy that sets x-forwarded-for (nginx, Traefik): then cookieless
+    # requests are rate-limited by the address the proxy appended rather than the proxy's own.
+    trust_x_forwarded_for: bool = False
     api_port: int = 8010
 
     config_dir: Path = PROJECT_ROOT / "config"
@@ -46,6 +63,10 @@ class Settings(BaseSettings):
     @property
     def sources_file(self) -> Path:
         return self.config_dir / "sources.yaml"
+
+    @property
+    def limits_file(self) -> Path:
+        return self.config_dir / "limits.yaml"
 
     @property
     def raw_dir(self) -> Path:

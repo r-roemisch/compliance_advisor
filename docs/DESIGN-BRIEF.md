@@ -9,7 +9,7 @@ Compliance Officers and the Compliance Function at large banks and insurers supe
 ## Style
 
 - Financial-services professional: like a premium bank intranet or a financial terminal, not a consumer app.
-- Navy or slate base, warm grey surfaces, one accent color for interaction; red and amber only for status.
+- Navy or slate base, cool blue-grey surfaces (warm grey until the redesign of 2026-10-24), one accent color (petrol) for interaction; red and amber only for status.
 - A sober sans-serif for the interface (for example Inter or IBM Plex Sans); provision references such as "Art. 17(1) DORA" or "§ 10 Abs. 1 GwG" get a distinct treatment.
 - Light and dark mode; WCAG AA contrast; full keyboard use.
 - Avoid: illustrations, emojis, gradients, messenger-style chat bubbles, anything that looks like a compliance verdict such as "compliant" checkmarks, and real company names or logos.
@@ -20,7 +20,7 @@ Compliance Officers and the Compliance Function at large banks and insurers supe
 2. **Passages.** Six per answer, each with number, short title, Provision label, issuer, Regulatory Layer, language, similarity score, cited or not, Legal Status, "as of" date, and a link to the exact Provision in the official text. Clicking a Citation highlights its Passage, and the other way round.
 3. **Regulatory Layer badges.** Distinct and consistent: EU Level 1 (regulation or directive), EU Level 2 (technical standard), EU Level 3 (EBA, EIOPA or ESMA guideline), German national law, BaFin supervisory practice. Binding law must look different from supervisory expectation.
 4. **"Not covered".** When the Sources do not answer a question or part of it, the interface shows that prominently, as a normal state, not an error.
-5. **Tool results.** Four tools, each result naming the Provision that decides it:
+5. **Rule Check results.** Four Rule Checks, each result naming the Provision that decides it:
    - Applicability check: which Regimes apply to the Firm Profile, and why.
    - Compliance timeline: dated Milestones, past and upcoming.
    - DORA incident classifier: major or not, with the reporting deadlines.
@@ -32,21 +32,29 @@ Compliance Officers and the Compliance Function at large banks and insurers supe
 10. **Cost and model.** Per answer: model, tokens and cost in money. A model choice that includes an EU-hosted model.
 11. **Pre-check notice.** When the app removed personal data (IBAN, email, phone) from a question, it says so above the answer.
 12. **Sources.** The indexed Sources with Legal Status, "as of" date and Passage count.
-13. **The permanent notice** below the chat: "This is regulatory information generated from the indexed Sources, not legal advice. Verify against the official text before relying on it." In German: "Dies sind regulatorische Informationen aus den indexierten Quellen, keine Rechtsberatung. Prüfen Sie den amtlichen Text, bevor Sie sich darauf stützen."
+13. **Search Strategy.** A second chip next to the model: vector search (default) or hybrid search, with a one-line note on which tested better. The answer's footer names the one used.
+14. **Answer Trace.** Under the answer, "How this answer was found" as a row of chips joined by arrows, each with a number: Pre-Check (what was removed), looked up directly, vector search (candidates), keyword search and merged (hybrid only), cap per source, Passages, rule checks, answer model (tokens, cost, seconds). A chip opens a panel with the Provisions and scores of that step. Compact, secondary in weight, never competing with the answer.
+15. **Refusal.** When the Pre-Check refuses a question: the question, a plain title ("This question was not answered"), the reason in one paragraph, and how to rephrase. A calm state, not an error: no red, no icon of alarm. In the history the entry is greyed with a small "refused" tag.
+16. **Changed Sources.** On the dashboard overview, an amber card "Your sources have changed" with one line per Source (title, date, provisions added, removed and changed, how many answers used the older version). On a reopened answer, the same in one amber line above the answer.
+17. **API keys.** In the account section: a name field and "Create key"; the new key shown once in a highlighted box with a copy hint; the list of keys with prefix, last use and "Revoke".
+18. **Operations page** (operators only, a further section in the dashboard menu): key-figure tiles (questions, accounts, cost, failed requests, answer time, similarity, citation share, coverage), questions per day, four small bar lists (cost per model, per search strategy, refusals per reason, errors per status), and the update runs with "Check now", the list of runs and the change records. A line at the top says that question texts are never shown here.
+19. **The permanent notice** below the chat: "This is regulatory information generated from the indexed Sources, not legal advice. Verify against the official text before relying on it." In German: "Dies sind regulatorische Informationen aus den indexierten Quellen, keine Rechtsberatung. Prüfen Sie den amtlichen Text, bevor Sie sich darauf stützen."
 
 ## States to design
 
 - Empty start: example questions in German and English, the active Firm Profile, the Sources.
-- Waiting: answers take 10 to 30 seconds; show steps such as "searching Sources", "checking with tools", "writing the answer".
+- Waiting: answers take 10 to 30 seconds; show steps such as "searching Sources", "running Rule Checks", "writing the answer".
 - Answer, answer with tool results, answer that is partly or fully "not covered".
-- Errors: invalid question, answer model unavailable, database unavailable.
+- Errors: invalid question, answer model unavailable, database unavailable, too many questions (with the time from which the next one is allowed).
+- Refused: a manipulation attempt or an off-topic question, with the reason and a hint.
+- An update run in progress on the operations page.
 
 ## Prompt for the design tool
 
 ```text
 Design a web app called "Compliance Advisor": a regulatory research tool for compliance
 officers at large banks and insurers supervised in Germany (insurance groups, reinsurers,
-ECB-supervised banks). Users ask questions in German or English; answers come from EU
+ECB-supervised banks). Compliance Officers ask questions in German or English; answers come from EU
 regulations, technical standards, German acts and BaFin guidance, with numbered citations.
 German UI by default, English one switch away.
 
@@ -78,7 +86,7 @@ Main screen:
 - A small permanent notice below the chat: not legal advice, verify against the official text.
 
 States: empty start with German and English example questions; waiting (10-30 s, steps
-"searching sources" -> "checking with tools" -> "writing the answer"); answer; answer with
+"searching sources" -> "running Rule Checks" -> "writing the answer"); answer; answer with
 tool results; partly or fully not covered; errors (invalid input, model unavailable,
 database unavailable).
 ```

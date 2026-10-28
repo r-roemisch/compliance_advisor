@@ -14,11 +14,11 @@ from langchain_core.tools import StructuredTool
 from pydantic import ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 
-from .precheck import redact
+from .precheck import redact, screen
 from .profile import FirmProfile
 from .prompt import DISCLAIMER, build_messages
 from .retriever import Retriever
-from .schemas import AskResponse, PassageOut, ToolRun, Usage
+from .schemas import AskResponse, PassageOut, ToolRun, Trace, Usage
 
 log = logging.getLogger("compliance_advisor.ask")
 
@@ -55,17 +55,19 @@ def _usage(*replies, prices: tuple[float, float] | None = None) -> Usage:
     total = Usage()
     for reply in replies:
         meta = getattr(reply, "usage_metadata", None) or {}
-        total.input_tokens += meta.get("input_tokens", 0)
-        total.output_tokens += meta.get("output_tokens", 0)
+        input_tokens, output_tokens = meta.get("input_tokens", 0), meta.get("output_tokens", 0)
+        total.input_tokens += input_tokens
+        total.output_tokens += output_tokens
         reported = (getattr(reply, "response_metadata", None) or {}).get("token_usage") or {}
-        total.cost_usd += float(reported.get("cost") or 0.0)
-    if not total.cost_usd and prices:
-        total.cost_usd = total.input_tokens * prices[0] + total.output_tokens * prices[1]
+        cost = float(reported.get("cost") or 0.0)
+        if not cost and prices:  # per reply: a streamed answer next to a priced screening call
+            cost = input_tokens * prices[0] + output_tokens * prices[1]
+        total.cost_usd += cost
     total.cost_usd = round(total.cost_usd, 6)
     return total
 
 
-_COVERAGE = re.compile(r"\s*[*_]*\s*Coverage:\s*(full|partial|none)\W*\s*$", re.IGNORECASE)
+_COVERAGE = re.compile(r"\s*[*_]*\s*Coverage:\s*[*_]*\s*(full|partial|none)\W*\s*$", re.IGNORECASE)
 
 
 def split_coverage(answer: str) -> tuple[str, str]:
@@ -106,9 +108,15 @@ class AnswerService:
         top_k: int,
         tools: ToolFactory | None = None,
         prices: Callable[[str], tuple[float, float] | None] | None = None,
+        strategy: str = "vector",
+        screeners: dict[str, BaseChatModel] | None = None,
     ):
-        """`models` maps model ids to chat models; `model_id` is the default."""
+        """`models` maps model ids to chat models; `model_id` is the default, and `strategy` the
+        default Search Strategy. `screeners` maps each Answer Model id to the model that screens
+        questions for it (ADR 0007); without it, questions are not screened."""
         self.retriever = retriever
+        self.strategy = strategy
+        self.screeners = screeners or {}
         self.models = models if isinstance(models, dict) else {model_id: models}
         self.model_id = model_id
         self.top_k = top_k
@@ -174,15 +182,48 @@ class AnswerService:
         profile: FirmProfile | None = None,
         model_id: str | None = None,
         on_stage: Stage = _quiet,
+        strategy: str | None = None,
     ) -> AskResponse:
         started = time.monotonic()
         model_id = model_id or self.model_id
+        strategy = strategy or self.strategy
         if model_id not in self.models:
             raise ValueError(f"unknown model {model_id!r}; choose one of {', '.join(self.models)}")
         question, redactions = redact(question)
+        on_stage("precheck", {"redactions": redactions})
+        screener = self.screeners.get(model_id)
+        screening_reply = None
+        if screener is not None:
+            verdict, screening_reply = screen(question, screener)
+            if verdict != "ok":
+                on_stage("refused", {"reason": verdict})
+                usage = _usage(screening_reply, prices=self.prices(model_id))
+                log.info("ask refused reason=%s model=%s", verdict, model_id)
+                return AskResponse(
+                    question=question,
+                    redactions=redactions,
+                    answer="",
+                    passages=[],
+                    cited=[],
+                    coverage="none",
+                    model=model_id,
+                    strategy=strategy,
+                    usage=usage,
+                    disclaimer=DISCLAIMER,
+                    refusal=verdict,
+                    trace=Trace(
+                        strategy=strategy,
+                        seconds={"total": round(time.monotonic() - started, 2)},
+                    ),
+                )
         on_stage("search", {"redactions": redactions})
         try:
-            passages = self.retriever.retrieve(question, top_k or self.top_k)
+            if hasattr(self.retriever, "search"):
+                passages, trace = self.retriever.search(question, top_k or self.top_k, strategy)
+            else:  # a retriever without an Answer Trace, as in tests
+                passages = self.retriever.retrieve(question, top_k or self.top_k, strategy)
+                trace = {"strategy": strategy, "vector": []}
+            trace["seconds"] = {"search": round(time.monotonic() - started, 2)}
         except openai.APIError as e:
             raise UpstreamError(f"the embedding service did not respond: {e}") from e
         except SQLAlchemyError as e:
@@ -197,16 +238,21 @@ class AnswerService:
             },
         )
         messages = build_messages(question, passages, profile.describe() if profile else "")
+        answering = time.monotonic()
         try:
             reply, replies, runs = self._tool_round(
                 self.models[model_id], messages, profile, on_stage
             )
         except openai.APIError as e:
             raise UpstreamError(f"the answer model did not respond: {e}") from e
+        trace["seconds"]["answer"] = round(time.monotonic() - answering, 2)
+        trace["seconds"]["total"] = round(time.monotonic() - started, 2)
 
         answer, coverage = split_coverage(_text(reply))
         if not usage_reported(replies):
             log.debug("cost computed from list prices for %s", model_id)
+        if screening_reply is not None:
+            replies = [screening_reply, *replies]  # the screening call is part of the cost
         usage = _usage(*replies, prices=self.prices(model_id))
         response = AskResponse(
             question=question,
@@ -229,19 +275,22 @@ class AnswerService:
             tools=runs,
             coverage=coverage,
             model=model_id,
+            strategy=strategy,
+            trace=Trace.model_validate(trace),
             usage=usage,
             disclaimer=DISCLAIMER,
         )
         log.info(
-            "ask duration=%.1fs model=%s input_tokens=%d output_tokens=%d tools=%s redactions=%s "
-            "passages=%s cited=%s",
+            "ask duration=%.1fs model=%s strategy=%s input_tokens=%d output_tokens=%d tools=%d "
+            "redactions=%d passages=%d cited=%d",  # counts only: no subject leaves the audit trail
             time.monotonic() - started,
             model_id,
+            strategy,
             usage.input_tokens,
             usage.output_tokens,
-            [r.name for r in runs],
-            redactions,
-            ",".join(p.passage_id for p in response.passages),
-            response.cited,
+            len(runs),
+            len(redactions),
+            len(response.passages),
+            len(response.cited),
         )
         return response

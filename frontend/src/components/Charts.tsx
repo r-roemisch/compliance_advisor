@@ -8,13 +8,14 @@ import type { Lang } from "@/lib/types";
  * Questions per day: one series, so no legend; the card title names it. Columns are at most
  * 24px wide with a 4px rounded top, square at the baseline, 2px apart; colour is the validated
  * chart token. Every column has a hover/focus tooltip, and a table carries the same data for
- * screen readers.
+ * screen readers. A day with questions is a button that opens them.
  */
 export function ActivityChart(props: {
   data: { date: string; count: number }[];
   lang: Lang;
   tooltip: (n: number) => string;
   label: string;
+  onSelect?: (date: string) => void;
 }) {
   const { data, lang } = props;
   const [hover, setHover] = useState<number | null>(null);
@@ -32,15 +33,18 @@ export function ActivityChart(props: {
         </div>
         <div className="relative h-36 border-b border-t border-line" onMouseLeave={() => setHover(null)}>
           <div className="absolute inset-0 flex items-end gap-[2px] px-[2px]">
-            {data.map((d, i) => (
-              <div
+            {data.map((d, i) => {
+              const clickable = props.onSelect !== undefined && d.count > 0;
+              const Column = clickable ? "button" : "div";
+              return (
+              <Column
                 key={d.date}
-                className="relative flex h-full flex-1 items-end justify-center"
+                className={`relative flex h-full min-w-0 flex-1 items-end justify-center ${clickable ? "cursor-pointer" : ""}`}
                 onMouseEnter={() => setHover(i)}
                 onFocus={() => setHover(i)}
                 onBlur={() => setHover(null)}
-                tabIndex={0}
-                role="img"
+                onClick={clickable ? () => props.onSelect?.(d.date) : undefined}
+                {...(clickable ? { type: "button" as const } : { "aria-hidden": true })}
                 aria-label={`${day.format(new Date(d.date))}: ${props.tooltip(d.count)}`}
               >
                 {d.count > 0 && (
@@ -55,8 +59,9 @@ export function ActivityChart(props: {
                     <span className="font-semibold tabular-nums">{props.tooltip(d.count)}</span>
                   </div>
                 )}
-              </div>
-            ))}
+              </Column>
+              );
+            })}
           </div>
         </div>
         <div />
@@ -81,27 +86,52 @@ export function ActivityChart(props: {
   );
 }
 
-/** Topics as horizontal bars, sorted, value at the tip. One series: no legend. */
-export function TopicBars(props: { rows: { label: string; count: number }[]; empty: string }) {
+/**
+ * Horizontal bars, sorted, value at the tip. One series: no legend. With onSelect, each row is a
+ * button that opens the questions behind it.
+ */
+export function TopicBars(props: {
+  rows: { id: string; label: string; count: number }[];
+  empty: string;
+  onSelect?: (id: string) => void;
+  selectLabel?: (label: string) => string;
+}) {
   if (props.rows.length === 0) return <p className="text-sm text-ink-3">{props.empty}</p>;
   const max = Math.max(...props.rows.map((r) => r.count));
   return (
-    <ul className="flex flex-col gap-3">
-      {props.rows.map((r) => (
-        <li key={r.label} className="grid grid-cols-[minmax(7rem,9rem)_1fr] items-center gap-3 text-sm">
-          <span className="truncate text-ink-2" title={r.label}>
-            {r.label}
-          </span>
-          <span className="flex items-center gap-2">
-            <span
-              className="block h-3 rounded-r-[4px] bg-chart"
-              style={{ width: `calc((100% - 2.5rem) * ${r.count / max})` }}
-              title={`${r.label}: ${r.count}`}
-            />
-            <span className="tabular-nums text-ink">{r.count}</span>
-          </span>
-        </li>
-      ))}
+    <ul className="flex flex-col gap-1">
+      {props.rows.map((r) => {
+        const content = (
+          <>
+            <span className="truncate text-left text-ink-2" title={r.label}>
+              {r.label}
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="block h-3 rounded-r-[4px] bg-chart" style={{ width: `calc((100% - 2.5rem) * ${r.count / max})` }} />
+              <span className="tabular-nums text-ink">{r.count}</span>
+            </span>
+          </>
+        );
+        const row = "grid w-full grid-cols-[minmax(7rem,9rem)_1fr] items-center gap-3 rounded-lg px-2 py-1.5 text-sm";
+        return (
+          <li key={r.id}>
+            {props.onSelect ? (
+              <button
+                type="button"
+                onClick={() => props.onSelect?.(r.id)}
+                aria-label={`${props.selectLabel?.(r.label) ?? r.label}: ${r.count}`}
+                className={`${row} transition-colors hover:bg-panel-2`}
+              >
+                {content}
+              </button>
+            ) : (
+              <div className={row} title={`${r.label}: ${r.count}`}>
+                {content}
+              </div>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }

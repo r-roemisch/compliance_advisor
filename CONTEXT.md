@@ -28,6 +28,10 @@ _Avoid_: Settings, company profile, persona
 A Compliance Officer's login, holding their Firm Profile and their own answers. Optional: without one, the Compliance Officer works as a guest.
 _Avoid_: User (in domain talk), profile (when the Firm Profile is meant)
 
+**Operator**:
+The person who runs the Compliance Advisor: watches how it performs and starts Update Runs. Sees figures and technical data across all Accounts, never question texts or answers.
+_Avoid_: Admin, administrator, superuser
+
 **Customer**:
 A customer of the Firm, for example the subject of a know-your-customer check. Never the person using the app.
 _Avoid_: Client, end user
@@ -45,6 +49,14 @@ _Avoid_: Source list, config, dataset
 **Corpus**:
 The ingested, searchable content of every Source in the Source Registry at a given moment.
 _Avoid_: Knowledge base, database, index (in domain talk)
+
+**Update Run**:
+One check of every Source in the Source Registry for a new version, loading again only the Sources whose text changed. Runs on a schedule or when an Operator starts it.
+_Avoid_: Sync, refresh, crawl, re-ingest (in domain talk)
+
+**Change Record**:
+The record of one Source changing in an Update Run: its old and new version and how many Provisions were added, changed or removed.
+_Avoid_: Changelog, diff, update log
 
 **Passage**:
 One indexed piece of a Source: the unit that is retrieved and cited.
@@ -76,6 +88,14 @@ _Avoid_: Tier, hierarchy, level (on its own), jurisdiction
 
 ### Answers
 
+**Pre-Check**:
+Everything that happens to a question before the search: personal data is removed, then the question is screened for attempts to manipulate the Compliance Advisor and for topics outside financial regulation.
+_Avoid_: Firewall, guardrail, filter
+
+**Refusal**:
+The Compliance Advisor declining a question the Pre-Check did not let through, with the reason: a manipulation attempt or a topic outside financial regulation. A question on financial regulation that the Corpus does not cover is not refused; it gets a coverage notice instead.
+_Avoid_: Block, rejection, error
+
 **Rule Check**:
 A check written in code that applies rules taken from the Sources to facts the Compliance Officer stated, and names the Provision that decides its result. It never fills in a missing fact; it reports it as missing.
 _Avoid_: AI check, calculator, tool (in domain talk)
@@ -88,6 +108,18 @@ _Avoid_: Legal advice, opinion, recommendation
 A reference from an answer to one Passage, shown as [n].
 _Avoid_: Reference, footnote, link
 
+**Search Strategy**:
+How Passages are found for a question: by meaning alone (vector search) or by meaning and exact words together (hybrid search). Chosen per question and recorded with the answer.
+_Avoid_: Retriever, search mode, RAG strategy
+
+**Answer Trace**:
+The saved record of every step from question to answer: what the pre-check removed, which Passages each search found and with what score, which were kept, which Rule Checks ran, and which Answer Model wrote the answer at what cost.
+_Avoid_: Debug info, log, pipeline view
+
 **Answer Model**:
 The language model that writes the answer the Compliance Officer reads.
 _Avoid_: LLM, the model, chat model
+
+**Blind Spot**:
+A Source that applies to the Firm Profile, according to the applicability Rule Check, but that none of the Account's answers drew on.
+_Avoid_: Gap, coverage gap, missing topic

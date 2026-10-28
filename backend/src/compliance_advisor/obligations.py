@@ -36,7 +36,7 @@ class ObligationRow(BaseModel):
     passage: int
 
 
-SYSTEM = """You extract regulatory obligations for a compliance team's obligation inventory.
+SYSTEM = """You extract regulatory obligations for a Compliance Function's obligation inventory.
 
 Rules:
 - Use only the numbered passages given. Extract each duty a passage imposes ("shall", "must", "hat ... zu", "muss", "sind verpflichtet"), one row per duty.

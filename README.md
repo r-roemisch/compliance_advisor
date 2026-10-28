@@ -1,6 +1,6 @@
 # Compliance Advisor
 
-**A regulatory research assistant for compliance teams at banks and insurers supervised in Germany. It answers from EU law, German acts and BaFin practice, cites the exact provision for every statement, and computes thresholds and deadlines with rule checks written in code.**
+**A regulatory research assistant for Compliance Officers at banks and insurers supervised in Germany. It answers from EU law, German acts and BaFin practice, cites the exact provision for every statement, and computes thresholds and deadlines with rule checks written in code.**
 
 > **Not legal advice.** The Compliance Advisor gives general regulatory information only. It does not replace a qualified lawyer or the firm's own compliance assessment.
 
@@ -14,12 +14,19 @@ Built as a Turing College bootcamp project. German interface by default, English
 - **Shows the layer of each rule.** A small stack glyph marks where a passage sits: EU regulation, EU technical standard, EU guideline, German law or BaFin practice. Binding law is drawn solid, supervisory expectation outlined.
 - **Knows what applies when.** Each source carries its legal status, version and dated milestones checked against its own text, so the AMLR is marked as applying only from 10 July 2027 and the AI Act's high-risk rules from 2 December 2027.
 - **Rule checks** that the model calls when a question needs an exact result: which regimes apply to a firm, the compliance timeline, whether an ICT incident is major under DORA (with the reporting deadline), and the AI Act risk class of an AI use.
+- **Search strategy per question**: vector search (by meaning, also across languages; the default) or hybrid search (meaning plus exact words). Each answer records which one it used.
+- **How this answer was found**: under every answer, the search as a row of steps with numbers (what the pre-check removed, provisions looked up directly, vector and keyword candidates with scores, how each of the six passages was found, rule checks, model, tokens, cost, seconds). Every step opens its details; the trace is stored with the answer.
+- **Pre-check before every search**: personal data is removed, then one short model call refuses manipulation attempts and off-topic questions, with the reason shown (see [How the Compliance Advisor protects its answers](#how-the-compliance-advisor-protects-its-answers)).
+- **Your sources have changed**: a nightly update run checks every source for a new version and reloads only what changed. The dashboard lists the sources your earlier answers relied on that have changed since; a reopened answer says so too.
+- **API keys and rate limits**: an account can create keys that may only ask questions and run rule checks, for its own programs or an MCP client. Guests get 10 questions an hour per browser (a signed cookie the backend sets; requests without a valid cookie share one bucket per address), accounts 30 an hour and 200 a day, registrations 5 an hour per address, login attempts 10 an hour per email, and the app has a daily cost ceiling (`config/limits.yaml`). Extracting obligations counts like a question.
+- **MCP server**: the four rule checks and a corpus search are offered over the Model Context Protocol at `/mcp`, with an API key, so other AI tools can use them.
+- **Operations page** for operators: figures across all accounts (questions, cost per model and search strategy, answer time, retrieval and citation signals, refusals, failed requests, update runs and change records), never question texts ([ADR 0006](docs/adr/0006-operator-sees-figures-not-questions.md)). The role is granted to an account with `uv run compliance-advisor-accounts operator grant <email>`.
 - **Firm Profile** with presets by firm type (insurance group, reinsurer, life insurer, significant bank, less significant bank, payment institution).
-- **Extract obligations** from an answer into a table of who must do what by when, with the provision, as CSV for Excel.
+- **Extract obligations** from an answer into a table of who must do what by when, with the provision, as CSV for Excel. The extraction runs on the model that wrote the answer, so an EU-hosted answer stays in the EU, and its cost is shown and counted.
 - **Timeline** of all dated milestones, or only those that apply to the Firm Profile.
 - **Audit trail**: every answer is stored with the exact source versions it used and can be exported as Markdown, JSON or PDF.
 - **Honest progress**: the steps appear as they happen, the search step names what it found, and the answer appears while it is written.
-- **Accounts and dashboard** (optional): sign up with email and password; your questions, answers and Firm Profile stay private to you. The dashboard has five sections: an overview (questions and extracted obligations, the next date, questions per day, most-asked topics, latest questions), a searchable table of all your questions with their topics and rule checks, all your extracted obligations in one table with CSV export, the upcoming dates for your Firm Profile, and profile and account settings. Deleting the account deletes its answers.
+- **Accounts and dashboard** (optional): sign up with email and password; your questions, answers and Firm Profile stay private to you. The dashboard has five sections. The overview covers 7, 30 or 90 days or every question: key figures, questions per day, most-asked regimes, the **most-cited provisions** and the **blind spots** (sources that apply to your Firm Profile but never came up in your questions, each with a ready question). Every bar and provision opens the questions behind it. The other sections: a searchable table of all your questions, all your extracted obligations in one table with CSV export, the upcoming dates for your Firm Profile, and profile and account settings. Deleting the account deletes its answers.
 - **Model choice** including an EU-hosted model (Mistral Large 4 on Mistral AI's own servers), with tokens and cost shown for every answer.
 
 | Answer being written | Rule check | Obligations |
@@ -29,6 +36,16 @@ Built as a Turing College bootcamp project. German interface by default, English
 | Timeline for a Firm Profile | Dark mode | Phone |
 |---|---|---|
 | ![Timeline tab](docs/screenshots/timeline.png) | ![Dark mode](docs/screenshots/answer-dark.png) | ![Phone layout](docs/screenshots/mobile.png) |
+
+![Dashboard: questions per day, most-asked regimes, most-cited provisions and blind spots](docs/screenshots/dashboard.png)
+
+| | | |
+|---|---|---|
+| ![A refused off-topic question with the reason](docs/screenshots/refusal.png) | ![Operations page: figures across all accounts, update runs](docs/screenshots/operator.png) | ![API keys in the account section](docs/screenshots/account-keys.png) |
+
+| | |
+|---|---|
+| ![The start screen with example questions and the model and search strategy chips](docs/screenshots/start.png) | ![An AI Act use-case answer with the rule check and a partial-coverage note](docs/screenshots/answer-ai.png) |
 
 ## Quick start
 
@@ -119,24 +136,42 @@ Plain code, not model output: each check applies rules taken from the sources' o
 - **Audit trail** of every answer with its source versions. With an account, answers are private to it; guests share one guest history ([ADR 0005](docs/adr/0005-optional-accounts-private-answers.md)).
 - **Accounts store** email address, name, Firm Profile and answers. Passwords are kept only as salted scrypt hashes and sessions as hashes in an httpOnly cookie. There is no email verification or password reset yet.
 
+## How the Compliance Advisor protects its answers
+
+Compliance Officers need to know what a tool does with their questions and how far its answers can be trusted. Five measures, each with what it does *not* cover:
+
+1. **Personal data is removed before anything leaves the app.** IBANs, email addresses and phone numbers in a question are replaced locally, before the question reaches any model. The interface asks not to enter confidential details; names and case facts are not recognised and stay the Compliance Officer's responsibility ([ADR 0004](docs/adr/0004-public-sources-only-no-firm-documents.md)).
+2. **Every question is screened, and refusals say why.** One short model call decides whether a question tries to change how the tool works (override its instructions, take on a role, plant an invented legal text, confirm a statement as law) or is not about financial regulation at all. Both are refused with the reason, and the question can be rephrased; there is no "answer anyway" button. Questions about exceptions, relief or what happens when rules are ignored are legitimate and pass. The screening runs on the cheapest model, or on the chosen EU-hosted model so that a question meant for an EU provider never goes elsewhere ([ADR 0007](docs/adr/0007-pre-check-screens-every-question.md)). **Measured on 2026-10-28** with [`config/precheck_set.yaml`](config/precheck_set.yaml): 30 of 30 attacks refused (18 manipulation attempts, 12 off-topic questions; every one with the expected reason), 0 of 30 legitimate questions that mention ignoring, skipping, hidden instructions or system prompts wrongly refused, and 0 of the 214 Golden Set questions wrongly refused. *Limits:* the test set holds the kinds of attack its author could think of; a new kind may pass. If the screening model fails to answer, the question passes unscreened and the event is logged, because a glitch must not refuse a legitimate question.
+3. **Passages are data, not instructions.** The prompt declares the question and the retrieved passages as material to answer from, never as instructions to follow. *Limit:* this is a prompt convention, not a hard boundary; the screening in point 2 is the layer that stops instructions reaching the model.
+4. **Every citation is checked.** A citation must point at one of the numbered passages the model was given; anything else is dropped. On the Golden Set every answer cites, and no citation points to a missing passage. *Limit:* a citation can be valid and still support a statement poorly; RAGAs faithfulness (0.96 on 50 questions) measures that, not the check.
+5. **Operators see figures, not questions.** The people running the app see counts, costs, times and error rates across all accounts, never question texts or answers; logs carry none either ([ADR 0006](docs/adr/0006-operator-sees-figures-not-questions.md)). Answers are private to the account that asked ([ADR 0005](docs/adr/0005-optional-accounts-private-answers.md)).
+
+Run the screening measurement yourself: `cd backend && uv run compliance-advisor-precheck-eval --label "..." --golden` (about $0.01).
+
 ## Evaluation
 
-`config/golden_set.yaml` holds 25 test questions (half in German), each with the provisions a good search must find. Thirteen can be answered from the first six sources, which is all the naive step 1 index holds, so it can be compared on them. Results on the draft Golden Set (review pending):
+`config/golden_set.yaml` holds 214 test questions (131 in German, 83 in English), each with the provisions a good search must find (every item is marked `status: draft`: the expected provisions were checked against the official texts in two passes but not yet reviewed by a compliance professional, which is why the evaluation log labels every run "draft"); 37 are real questions from official Q&As (EBA, EIOPA, BaFin and others). 100 can be answered from the first six sources, which is all the naive step 1 index holds, so it can be compared on them. Results on the full set (2026-10-28):
 
 | Retrieval set-up | Questions | hit@6 | recall@6 | MRR |
 |---|---|---|---|---|
-| Naive fixed-size chunks (step 1 baseline) | 13 | 0.77 | 0.77 | 0.67 |
-| One passage per provision | 13 | 1.00 | 0.96 | 0.69 |
-| Per provision + direct lookup of named provisions (the app) | 25 | 0.92 | 0.86 | 0.72 |
-| Per provision + lookup + cap of three passages per source | 25 | 0.88 | 0.81 | 0.72 |
+| Naive fixed-size chunks (step 1 baseline) | 100 | 0.82 | 0.73 | 0.64 |
+| One passage per provision | 100 | 0.87 | 0.74 | 0.62 |
+| Per provision + direct lookup of named provisions (the app, vector search) | 214 | **0.85** | **0.69** | **0.67** |
+| The app with hybrid search (keyword ranks at full weight) | 214 | 0.79 | 0.61 | 0.60 |
+| The app with hybrid search (keyword ranks at half weight) | 214 | 0.81 | 0.64 | 0.61 |
 
-The cap was switched off because of this result. Answers: every answer cites, and no citation points to a missing passage; answers citing an expected provision rise from 77 % (naive, 13 questions) to 88 % (app with rule checks, 25 questions).
+Results are also split by kind of question in [docs/EVALUATION.md](docs/EVALUATION.md). The weakest kind is cross-lingual: a German question about an English EU act is found in 73 % of cases, against 93 % when question and source share a language. **Hybrid search did not pay off**: keyword search brings in passages that share words with the question but not its meaning, mostly German texts for German questions about English EU acts, and recitals that repeat an act's name. Its best variant was chosen on one half of the Golden Set and still lost on the other half (0.81 against 0.83), so vector search stays the default and hybrid search is offered as a choice. A cap of three passages per source was also measured (earlier 25-question draft) and switched off because it cost hits. Answers: every answer cites, and no citation points to a missing passage; answers citing an expected provision rise from 77 % (naive, 13 questions) to 88 % (app with rule checks, 25 questions).
+
+Answers are also graded with [RAGAs](https://docs.ragas.io/) on a fixed sample of the Golden Set: *faithfulness* (is every statement backed by the passages and rule-check results the model was given?) and *factual correctness* (does the answer agree with the Golden Set's model answer?). The grader is Gemma 4 31B, from another model family than the answer models, chosen after grading the same ten answers with Gemini 3.8 Flash as well: the two agreed on faithfulness but not on factual correctness, so that score is read as a comparison between runs, not as an absolute. Every run has a cost cap. Mistral Large 4 on the same sample, stopped by the $0.60 cap after 20 questions: on those 20, faithfulness 0.90 against 0.96 for Luna, factual correctness 0.30 against 0.50; a Mistral answer cost about $0.02, twenty times Luna's. Luna stays the default.
 
 ```bash
 cd backend
 uv run compliance-advisor-eval --label "what changed"                  # naive, provision, app
 uv run compliance-advisor-eval --label "..." --setups lookup cap       # one change at a time
-uv run compliance-advisor-eval --label "..." --answers                 # also generate and score answers
+uv run compliance-advisor-eval --label "..." --setups app hybrid --halves   # choose on one half, report the other
+uv run compliance-advisor-eval --label "..." --answers --max-cost 0.25 # also generate and score answers, with a cost cap
+uv run --group eval compliance-advisor-ragas --label "..." --n 50     # grade answers with RAGAs on a fixed sample
+uv run compliance-advisor-precheck-eval --label "..." --golden         # attacks refused, legitimate questions passed
 uv run compliance-advisor-ingest --chunker fixed --source eu-dora --source eu-dora-rts-incidents \
     --source eu-amlr --source de-gwg --source de-bafin-aua-gwg --source de-zag   # builds the naive index
 ```
@@ -150,32 +185,38 @@ docker compose up -d postgres                          # database only
 cd backend && uv sync
 uv run compliance-advisor-ingest --dry-run             # load and cut only; no key, no database
 uv run compliance-advisor-api                          # API on :8010
-uv run pytest                                          # 50 tests, no network, no database
+uv run pytest                                          # 105 tests, no network, no database
 cd ../frontend && npm install && npm run dev           # page on :3010, /api forwarded to :8010
 ```
 
 | Endpoint | Does |
 |---|---|
-| `POST /api/ask` | Question (3 to 2000 characters, optional `profile`, `model`, `top_k`) in; answer, numbered passages, cited numbers, rule-check results, coverage, pre-check removals, model, tokens, cost and the notice out |
+| `POST /api/ask` | Question (3 to 2000 characters, optional `profile`, `model`, `strategy` (`vector` or `hybrid`), `top_k`) in; answer, numbered passages, cited numbers, rule-check results, coverage, pre-check removals, model, search strategy, tokens, cost and the notice out |
 | `POST /api/ask/stream` | The same as server-sent events: one per step, the answer text as it is written, then the result |
 | `GET /api/sources` | Sources with legal status, version, milestones, download date and passage count |
-| `GET /api/profiles`, `GET /api/models` | Firm Profile presets; Answer Models from `config/models.yaml` |
+| `GET /api/profiles`, `GET /api/models` | Firm Profile presets; Answer Models from `config/models.yaml`, the search strategies and the default one |
 | `GET /api/history?q=`, `GET /api/history/{id}` | Your stored answers (or the guest answers), with a search |
 | `GET /api/history/{id}/export?format=md\|json` | One stored answer as Markdown or JSON, with source versions |
 | `POST /api/history/{id}/obligations` | Extracts the obligations behind a stored answer and stores them |
 | `POST /api/timeline` | Milestones, optionally only for a Firm Profile and only upcoming ones |
 | `POST /api/auth/register`, `/login`, `/logout`; `GET /api/auth/me` | Accounts; the session is an httpOnly cookie |
 | `PUT /api/me/profile`, `DELETE /api/me` | Save the Firm Profile; delete the account with its answers |
-| `GET /api/me/dashboard`, `/api/me/questions?q=`, `/api/me/obligations` | Dashboard overview; all own questions with topics and rule checks; all own extracted obligations |
+| `GET /api/me/dashboard?days=` | Dashboard overview for 7, 30 or 90 days (0 = every question): key figures, questions per day, regimes, most-cited provisions, blind spots for the saved Firm Profile, latest questions, upcoming dates |
+| `GET /api/me/questions?q=&regime=&provision=&day=&days=`, `/api/me/obligations` | Own questions, narrowed by a search and by what was clicked on the dashboard; all own extracted obligations |
+| `GET /api/me/keys`, `POST /api/me/keys`, `DELETE /api/me/keys/{id}` | API keys of the account: list, create (the secret is returned once), revoke |
+| `GET /api/me/changes` | Sources the account's answers relied on whose text has changed since, with the change record |
+| `GET /api/operator/overview?days=` | Operators only: figures across all accounts, never question texts |
+| `GET /api/operator/update-runs`, `POST /api/operator/update-runs` | Operators only: the latest update runs and change records; start a run ("check now") |
+| `/mcp/` | The MCP server (streamable HTTP): the four rule checks and `search_corpus`, with `Authorization: Bearer <API key>` |
 | `GET /api/health` | Backend and database status |
 
-Errors come back as `{"detail": "..."}`: 422 for invalid input, 502 when OpenRouter does not respond, 503 when the database is not reachable.
+Errors come back as `{"detail": "..."}`: 401 without a valid session or key, 403 for an API key on an account endpoint or a non-operator on an operator endpoint, 404 for an answer or key that is not yours, 409 when an update run is already in progress, 422 for invalid input, 429 when a rate limit or the daily cost ceiling is reached (`Retry-After` and `X-Limit` headers), 500 for anything unforeseen (counted for the operator, never with the exception's text), 502 when OpenRouter does not respond, 503 when the database is not reachable.
 
 ## Bootcamp requirements
 
 | Requirement | Where |
 |---|---|
-| **1. RAG**: knowledge base, embeddings, chunking, similarity search | 18 sources; per-provision chunking with a naive fixed-size baseline; `text-embedding-3-small`; pgvector cosine search |
+| **1. RAG**: knowledge base, embeddings, chunking, similarity search | 18 sources; per-provision chunking with a naive fixed-size baseline; `text-embedding-3-small`; pgvector cosine search, optionally merged with Postgres keyword search |
 | **2. Tool calling**: at least three domain tools | four rule checks the model calls (applicability, timeline, DORA incident, AI Act use case) |
 | **3. Domain specialisation** and security | German financial supervision; prompts for compliance professionals; pre-check for personal data; no uploads; passages treated as data, not instructions |
 | **4. LangChain with OpenRouter**, error handling, input validation | `langchain-openai` against OpenRouter; 422/502/503 with clear messages; question length and profile validated |
@@ -185,18 +226,23 @@ Errors come back as `{"detail": "..."}`: 422 for invalid input, 502 when OpenRou
 |---|---|
 | Conversation history and export | yes: history, Markdown, JSON, PDF via print; obligations as CSV |
 | Source citations | yes |
-| Visualisation of the RAG process | partly: live steps with found sources, layer glyph and strip |
+| Visualisation of the RAG process | yes: live steps while answering, and under every answer "How this answer was found" with every step's numbers and details, stored with the answer |
 | Help feature | partly: start screen with explanation and example questions |
 | Multi-model support | yes: GPT-6 Luna, Mistral Large 4 (EU), Claude Sonnet 5.5 |
 | Token usage and costs | yes, per answer |
 | Visualisation of tool results | yes, one card layout per rule check |
-| Prompt-injection protection | partly: passages and question are declared data in the prompt; no separate filter |
+| Prompt-injection protection | yes: pre-check screening of every question with a measured test set (30 of 30 attacks refused, 0 of 244 legitimate questions refused), refusals with reasons; see the section above |
 | Authentication and personalisation | yes: optional accounts (email and password), Firm Profile saved to the account, dashboard, private searchable archive |
-| Logging | partly: one log line per question and the audit trail; no monitoring |
+| Logging and monitoring | yes: JSON logs without question texts, failed requests counted, operations page with figures across all accounts |
 | Multi-language support | yes: German and English interface; answers in the question's language; sources in both languages |
 | A/B testing of RAG strategies | yes, offline: five retrieval set-ups compared on the Golden Set |
-| Evaluation of the RAG system | yes: own retrieval and answer metrics, logged per run |
-| Not done | hybrid search, automated knowledge-base updates, rate limiting, MCP server, analytics dashboard |
+| Evaluation of the RAG system | yes: own retrieval and answer metrics, and RAGAs faithfulness and factual correctness on a fixed sample, logged per run |
+| Analytics dashboard | yes: per account (period switch, questions per day, regimes, most-cited provisions, blind spots, changed sources; every bar opens the questions behind it) and an operations page across all accounts for operators |
+| Hybrid search | yes, as a choice per question: Postgres keyword search (German and English stemming) merged with vector search by reciprocal rank fusion; measured on the Golden Set and not the default, because it lost to vector search |
+| Real-time data updates and automated knowledge-base updates | yes: nightly update run (or "check now") that re-downloads every source, reloads only changed ones and keeps a change record; changed sources are flagged on the dashboard and on reopened answers |
+| Rate limiting and API key management | yes: per-account API keys (hashed, revocable, ask-only), limits per guest browser and per account, daily cost ceiling |
+| Tools as MCP servers | yes: the four rule checks and a corpus search at `/mcp` (streamable HTTP, API key) |
+| Not done | connecting tools from an external MCP server |
 
 ## Documentation
 

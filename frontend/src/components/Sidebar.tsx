@@ -86,9 +86,10 @@ export function Sidebar(props: {
                               current ? "bg-panel text-ink shadow-[0_1px_2px_var(--shadow)]" : "text-ink-2 hover:bg-panel hover:text-ink"
                             }`}
                           >
-                            <span className="line-clamp-2">{h.question}</span>
+                            <span className={`line-clamp-2 ${h.refused ? "text-ink-3" : ""}`}>{h.question}</span>
                             <span className="mt-0.5 block text-xs text-ink-3 tabular-nums">
                               {(group.recent ? timeFmt : fullFmt).format(new Date(h.created_at))}
+                              {h.refused && <span className="ml-2 rounded-full bg-track px-1.5 py-px text-[11px]">{props.t.refusedMark}</span>}
                             </span>
                           </button>
                         </li>

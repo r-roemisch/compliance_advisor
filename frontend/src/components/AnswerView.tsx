@@ -6,6 +6,7 @@ import remarkGfm from "remark-gfm";
 import { exportUrl } from "@/lib/api";
 import type { Strings } from "@/lib/i18n";
 import type { AskResponse, Lang } from "@/lib/types";
+import { AnswerTrace } from "./AnswerTrace";
 import { LayerStrip } from "./LayerStrip";
 
 /** Turns citations into links the renderer shows as chips: "[2]", "[1, 3]", "[1, Art. 32 Abs. 1]". */
@@ -46,6 +47,11 @@ export function AnswerView(props: {
         {result.redactions.length > 0 && (
           <p role="note" className="mb-3 rounded-lg bg-panel-2 px-3 py-2 text-sm text-ink-2">
             {t.redacted(kinds)}
+          </p>
+        )}
+        {result.changed_sources && result.changed_sources.length > 0 && (
+          <p role="note" className="mb-3 rounded-lg bg-amber-soft px-3 py-2 text-sm">
+            {t.sourceChangedNote(result.changed_sources.map((c) => c.short_title).join(", "))}
           </p>
         )}
         {(result.coverage === "none" || result.coverage === "partial") && (
@@ -96,9 +102,11 @@ export function AnswerView(props: {
           </ReactMarkdown>
         </div>
         <LayerStrip passages={result.passages} cited={result.cited} lang={lang} label={t.layersUsed} />
+        <AnswerTrace t={t} lang={lang} result={result} />
       </div>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line px-5 py-2.5 text-xs text-ink-2">
         <span>{result.model}</span>
+        <span>{t.strategies[result.strategy ?? "vector"]}</span>
         <span className="tabular-nums">{t.tokens(result.usage.input_tokens, result.usage.output_tokens)}</span>
         {cost && <span className="tabular-nums">{cost}</span>}
         {result.id && (

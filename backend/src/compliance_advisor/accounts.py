@@ -12,7 +12,18 @@ import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import Column, DateTime, ForeignKey, String, Table, delete, select, update
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    String,
+    Table,
+    delete,
+    select,
+    text,
+    update,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
@@ -32,6 +43,7 @@ users = Table(
     Column("password_hash", String(300), nullable=False),
     Column("profile", JSONB),  # the Firm Profile, saved with the account
     Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("operator", Boolean, nullable=False, default=False),  # granted by a command, ADR 0006
 )
 
 sessions = Table(
@@ -89,6 +101,28 @@ class AccountStore:
     def __init__(self, engine: Engine):
         self.engine = engine
         metadata.create_all(engine, checkfirst=True)
+        with engine.begin() as connection:  # tables created before the operator flag existed
+            connection.execute(
+                text(
+                    "alter table users add column if not exists operator boolean "
+                    "not null default false"
+                )
+            )
+
+    def set_operator(self, email: str, operator: bool) -> bool:
+        """Grants or revokes the Operator role; returns False when no account has the email."""
+        with self.engine.begin() as connection:
+            result = connection.execute(
+                update(users)
+                .where(users.c.email == email.strip().lower())
+                .values(operator=operator)
+            )
+        return bool(result.rowcount)
+
+    def operators(self) -> list[str]:
+        with self.engine.connect() as connection:
+            rows = connection.execute(select(users.c.email).where(users.c.operator.is_(True)))
+            return sorted(r.email for r in rows)
 
     def register(self, email: str, password: str, name: str = "") -> dict:
         email = email.strip().lower()

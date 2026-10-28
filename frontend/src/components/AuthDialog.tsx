@@ -6,10 +6,16 @@ import { ApiError, login, register } from "@/lib/api";
 import type { Strings } from "@/lib/i18n";
 import type { User } from "@/lib/types";
 
-export function AuthDialog(props: { open: boolean; t: Strings; onDone: (user: User) => void; onClose: () => void }) {
+export function AuthDialog(props: {
+  open: boolean;
+  t: Strings;
+  initialMode?: "login" | "register";
+  onDone: (user: User) => void;
+  onClose: () => void;
+}) {
   const { t } = props;
   const ref = useRef<HTMLDialogElement>(null);
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<"login" | "register">(props.initialMode ?? "login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");

@@ -52,7 +52,7 @@ Built in three sub-steps with a check-in after each.
 
 ### Settings
 
-`.env`: `OPENROUTER_API_KEY`, `DATABASE_URL`, `EMBEDDING_MODEL`, `ANSWER_MODEL`, `TOP_K`, `CHUNK_SIZE`, `CHUNK_OVERLAP`.
+`.env`: `OPENROUTER_API_KEY`, `DATABASE_URL`, `EMBEDDING_MODEL`, `TOP_K`, `CHUNK_SIZE`, `CHUNK_OVERLAP` (the Answer Models moved to `config/models.yaml` on day 3).
 
 ### Done when (all four met on 2026-10-21)
 
@@ -115,7 +115,7 @@ Trust must-haves: links to the exact provision, legal status and "as of" dates, 
 - Added during the build: five retrieval set-ups are measured separately (naive, provision, lookup, cap, app). Draft results: cutting per Provision raises hit@6 on the seed questions from 0.77 to 1.00; the named lookup adds hits (0.88 to 0.92 on all questions); the per-Source cap costs hits (it pushed Art. 18 DORA out for the major-incident question) and helps only the crowding case's rank. A crowding case was added to the Golden Set so the trade-off stays measured.
 - Progress made trustworthy (asked for on 2026-10-23): the steps reached the browser only at the end, because the Next.js server compressed the stream; the stream is now marked `no-transform`. The model's output is streamed, so "writing" is reported when the first words arrive and the answer appears word by word; the search step names what it found. No artificial delay was added. Streamed replies carry no cost from OpenRouter, so cost is computed from OpenRouter's per-token list prices.
 - Answer evaluation (draft Golden Set): all answers cite and all citations are valid; answers citing an expected Provision rise from 77 % (naive, 13 questions) to 88 % (app, 25 questions); "full" coverage from 3 of 13 to 15 of 25.
-- Open: your review of the Golden Set, then the decision whether to switch the cap off (`MAX_PER_SOURCE=0`) and a final run on the reviewed set.
+- Resolved since: the cap was switched off on 2026-10-23; the Golden Set stays a draft by decision of 2026-10-28, and the full-set runs are in E1.
 
 ### Day 5: Buffer and submission (done 2026-10-23)
 
@@ -130,12 +130,91 @@ Trust must-haves: links to the exact provision, legal status and "as of" dates, 
 - Dashboard at `/dashboard`, reworked after feedback (no cost, no first-question date; structure modelled on the OpenRouter dashboard): section menu with overview (key figures, questions per day, most-asked topics, latest questions), questions table with search, all extracted obligations in one table with CSV (a first stored obligation inventory), upcoming dates for the Firm Profile, profile and account; account deletion removes the answers too.
 - Not yet: email verification, password reset, login through an identity provider such as Microsoft Entra ID.
 
+## Redesign and dashboard analytics (2026-10-24)
+
+- Interface redesigned in the "petrol, cooler and crisper" palette, chosen from four options: cool blue-grey page, deeper navy text, petrol as the one accent; every text colour passes 4.5:1 (the old grey for dates and counters did not). The layer stack became the logo. Header as one bar (pill switch for Research and Dashboard, Firm Profile chip, theme button); question box as one raised card with the model choice inside; example questions as cards; history grouped by today, yesterday and earlier; the same shapes and buttons on every screen. All ten screenshots retaken.
+- Dashboard made analytical: a period switch (7, 30, 90 days or every question), **most-cited provisions** (in how many answers each Provision was cited), **Blind Spots** (Sources that apply to the Firm Profile under the applicability Rule Check but never came up, each with a ready question), and click-through: every day, topic and provision opens the questions behind it, with removable filter chips. Calculations in `backend/src/compliance_advisor/analytics.py`; 57 tests.
+
+## Extensions (planned 2026-10-28)
+
+Nine steps from `soft_requirements.txt`, decided in the design session of 2026-10-28 (terms in `CONTEXT.md`, ADRs 0006 and 0007). One step at a time: finished, tested and committed before the next, with eval figures wherever an eval exists. The Answer Models stay as they are (GPT-6 Luna, Mistral Large 4, Claude Sonnet 5.5).
+
+**OpenRouter budget: about $2.50 for all nine steps, raised to about $3.50 during the day.** All tests and trial questions use GPT-6 Luna. Every eval run has a cost cap and stops when it is reached. Spent on 2026-10-28: about $1.50 (RAGAs calibration $0.67, RAGAs baseline $0.21, Mistral comparison $0.52, everything else under $0.10); about $2.00 left. Per-run costs in `docs/EVALUATION.md`.
+
+### E1. Eval breakdown and hybrid search (done 2026-10-28: vector stays the default, 64 tests) — C: hybrid search
+
+- Eval results split by question `type` and `cross_lingual`; a cost cap per run (`--max-cost`); a fixed split into a tuning and a held-out half (`--halves`); each question is searched once per set-up.
+- Search Strategy chosen per question next to the Answer Model and recorded with the answer: vector search, or hybrid search (Postgres keyword search with German and English stemming, merged with vector search by reciprocal rank fusion; nothing re-embedded).
+- Result on 214 questions: vector 0.85 hit@6, hybrid 0.79. Keyword search pulls in German texts for German questions about English EU acts, and recitals. Two variants tried, chosen on the tuning half: re-sorting only the vector candidates (0.78) and keyword ranks at half weight (0.82, against 0.88 for vector); on the held-out half half weight still lost (0.81 against 0.83). Hybrid search is offered with half weight; vector search stays the default.
+- Found on the way: cross-lingual questions are the weakest kind (0.73 against 0.93). Translating the question into the Source's language would target this; not planned yet.
+
+### E2. RAGAs evaluation (done 2026-10-28: faithfulness 0.96, factual correctness 0.51 on 50 questions) — C: evaluation with RAGAs
+
+- `compliance-advisor-ragas` (dependency group `eval`; `langchain-community` pinned to 0.4.1 because ragas 0.4.3 imports a module that 0.4.2 dropped): faithfulness and factual correctness (against `answer_key`); context recall left out, as recall@6 covers it. A fixed sample of 50 questions, taken in turn from every question type; a cost cap that counts the questions still running.
+- Grader: Qwen was blocked by the OpenRouter guardrail, so Gemma 4 31B was calibrated against Gemini 3.8 Flash on 10 answers: faithfulness 0.03 apart, factual correctness 0.22 apart (limit 0.15 missed). Gemini scored lower throughout, gave 0.0 to answers that match the key in the cases checked, was cut off in 4 of 10 gradings and cost 13 times more; Gemma stays the grader and factual correctness is read as a comparison between runs. The first calibration failed on most answers because ragas allows graders 1,024 output tokens; now 4,096.
+- Baseline (GPT-6 Luna, vector search): faithfulness 0.96, so the model hardly states anything the Passages do not back; factual correctness 0.51, mostly because the right Provision was not among the six Passages and the answer says so. The weak point is the search, not the Answer Model. Cost $0.21 per run.
+- Mistral Large 4 on the same sample, stopped by the $0.60 cap after 20 questions: on those 20, faithfulness 0.90 against 0.96 for Luna, factual correctness 0.30 against 0.50; a Mistral answer cost about $0.02, twenty times Luna's. Luna stays the default.
+
+### E3. Answer Trace (done 2026-10-28) — A: visualisation of the RAG process
+
+- Every answer carries its Answer Trace (`trace` in the response, stored with the answer): what the Pre-Check removed, Provisions looked up directly, the vector and keyword candidates with scores, the merged order, what the per-Source cap held back, how each of the six Passages was found, the Rule Checks, and seconds per step. The interface shows it under the answer as a flow of chips with the numbers; each chip opens its details. Answers stored before have no trace and show nothing.
+
+### E4. Pre-Check and Refusals (done 2026-10-28: 30 of 30 attacks refused, 0 of 244 legitimate questions refused) — B: prompt-injection protection
+
+- After personal data is removed, one model check screens the question (`precheck.screen`): GPT-6 Luna, or the chosen Answer Model itself when it is EU-hosted (ADR 0007). Manipulation attempts and topics outside financial regulation get a Refusal with the reason (`refusal` in the response, kept in the history as "refused"); questions the Corpus does not cover keep the coverage notice. No "answer anyway". If the screening call fails or answers unreadably, the question passes and the event is logged. The screening call's tokens count towards the answer's cost (about $0.00005 with Luna).
+- `config/precheck_set.yaml` (18 manipulation attempts, 12 off-topic questions, 30 legitimate questions that mention ignoring, skipping, hidden instructions or system prompts) and `compliance-advisor-precheck-eval --golden`: 30 of 30 attacks refused, all with the expected reason; 0 of 30 suspicious-looking questions and 0 of 214 Golden Set questions wrongly refused; $0.01. README section "How the Compliance Advisor protects its answers" with the figures and the limits; a note on the start screen.
+
+### E5. API keys and rate limiting (done 2026-10-28) — B: rate limiting and API key management
+
+- Review fix 2026-10-28: "Extract Obligations" counts like a question, runs on the Answer Model the answer used (an EU-hosted answer stays in the EU), skips refused answers, and its cost is stored with the answer (`obligations_cost`) and counted in the daily ceiling and the Operator figures. Registrations are limited per address and login attempts per email (`config/limits.yaml`).
+- Keys per Account (`apikeys.py`, dashboard section Account): named, shown once, stored as a SHA-256 hash with a prefix, revocable, last use shown. `Authorization: Bearer ca_...` works only on `/api/ask`, `/api/ask/stream` and the MCP server; every account endpoint answers 403 to a key; the public ones (`/api/models`, `/api/sources`, `/api/profiles`, `/api/timeline`) ignore it. Answers asked with a key are stored in the Account's history with the key's name.
+- `config/limits.yaml`: guests 10 questions per hour per browser, Accounts 30 per hour and 200 per day (a key shares its Account's budget), and a daily cost ceiling for the whole app from the audit trail. A refusal is a 429 with `Retry-After`; the interface shows "try again from 14:35". Counters per subject live in the backend's memory and restart with it.
+- Guests were first limited per address. The review on 2026-10-28 found that the Next.js proxy forwards `x-forwarded-host` but not `x-forwarded-for`, so every browser arrived as 127.0.0.1 and all guests shared one bucket. Now the backend sets a signed random guest id in an httpOnly cookie on the first response (`limits.GuestCookie`, not for `/mcp`), and the limit counts per browser; a forged or missing cookie falls back to one bucket per address, so minting cookies buys nothing. A client-supplied `x-forwarded-for` passes through the proxy, so it is believed only with `TRUST_X_FORWARDED_FOR=true` behind a real reverse proxy (last entry). Idle counters are evicted after a day. The signing key is per process: a restart reissues cookies.
+
+### E6. Logging and monitoring (done 2026-10-28) — B: logging and monitoring
+
+- Review fixes 2026-10-28: a 503 is counted in memory instead of being written to the database that is down (`monitoring.memory_errors`), other failed requests are written off the event loop, and database connects time out after three seconds.
+
+- Logs as one JSON object per line (`LOG_FORMAT=json`, `text` for reading by eye), without question texts. Failed requests (502, 503, 500) are counted in an `events` table; everything else the Operator sees comes from the audit trail. Operators were first the addresses in `OPERATOR_EMAILS`; since the review of 2026-10-28 the role is a flag on the account granted with `compliance-advisor-accounts operator grant <email>`, because open registration would have let anyone become the listed address (ADR 0006, amended). `/api/auth/me` tells the interface.
+- `GET /api/operator/overview?days=`: questions, answered and refused, Accounts and guest questions, questions via API key, cost, failed requests, average answer time, average similarity of the best Passage, share of answers with a Citation and with full coverage, questions per day, cost per Answer Model and per Search Strategy, Refusals per reason, errors per status. Shown as the dashboard section "Operations" (ADR 0006: figures, never texts).
+
+### E7. Dashboard (done 2026-10-28) — C: advanced analytics dashboard
+
+- Operator view across all Accounts (see E6) with the Update Runs and Change Records and a "check now" button (see E8).
+- For the Compliance Officer: "Your sources have changed" on the overview (`GET /api/me/changes`): Sources their answers relied on whose checksum differs from the current copy, with the Change Record and how many answers used an older version. A reopened answer carries the same notice ("changed since this answer"); the answer itself stays as it was.
+
+### E8. Update Runs (done 2026-10-28) — B: real-time data updates, C: automated knowledge-base updates
+
+- `update.py`: an Update Run downloads every Source again and compares the file's checksum with `meta.json`. A changed file is chunked and its Passage ids compared with the stored ones, because BaFin web pages differ on every download without a word changing (found in the first real run: MaGo "changed" with 0 Provisions changed); only a Source whose text changed is embedded again, with its old Passages replaced in one step, and gets a Change Record counting the Provisions added, removed and changed. The text fingerprint goes into `meta.json` and into each answer's stored Source versions, so "changed since this answer" is text-based too. Runs start nightly inside the backend (`UPDATE_RUNS=true`, `UPDATE_HOUR`, a daemon thread) or from the Operator's "check now"; a process-level lock allows one run at a time (the first version checked the database and let two runs start). Failures of one Source are noted on the run and do not stop it. First real run: 18 Sources checked in 21 seconds, none with changed text. After the review of 2026-10-28 the run stages a changed file under `data/raw/.incoming/`, chunks it there, replaces the Passages in one transaction (`store.replace_source`) and only then moves the file and writes `meta.json`, so a failed reload is retried next time and never leaves the Source out of the index; the run row is always finished, even when the loop itself fails. A fresh download keeps the text fingerprint (`fetch.save_meta`), and the naive baseline's ingest no longer writes one. Changes to the Source Registry stay manual.
+
+### E9. MCP server (done 2026-10-28) — C: tools as MCP servers
+
+- `mcp_server.py` (MCP Python SDK 2.3, streamable HTTP, stateless, JSON responses) mounted at `/mcp` in the same backend: the four Rule Checks with explicit Firm Profile fields, and `search_corpus` (Passages with Provision, Source, link, legal status and similarity; writes no answer, so outside calls cost no Answer Model fees). Every request needs an API key in `Authorization: Bearer ca_...`; the key's Account pays into its own rate limit. Run locally; publishing it is a hosting decision for later. Claude Desktop or Claude Code connect with the URL `http://localhost:8010/mcp/` and the key as a bearer token.
+
+### Review fixes, block B (done 2026-10-28)
+
+- Retriever: Provisions named in the question take at most half the slots, and named hits beyond that now still come through the ranking instead of being dropped. The coverage line is recognised in its usual Markdown form (`**Coverage:** partial`), so it no longer leaks into the answer as "unknown".
+- The live progress starts with "Frage prüfen" (the Pre-Check) before "Quellen durchsuchen"; the Rule Check step shows only when one ran; the found line says "6 Passagen aus DORA, GwG" instead of counting passages as sources; the `refused` stream event is typed.
+- A stored Firm Profile is kept only if every value still exists (frontend `validProfile`; the backend's dashboard tolerates a stale one), so a renamed firm type or activity cannot wedge every question with a 422.
+- A 429 names its limit (`X-Limit: questions | daily-cost`); the daily cost ceiling is shown as such with the date, not as a personal limit with a time. The usual failures (401, 403, 404, 502, 503) are shown in the interface language; a 401 on an account call signs the interface out, so an expired session no longer looks signed in.
+- Dashboard: `/dashboard#operator` falls back to the overview for non-operators; errors clear on the next success; deleting the account and revoking a key report failures; "your sources have changed" refreshes with new answers; refused questions are tagged in the questions table and counted next to the questions figure; the Markdown export of a refused answer states the refusal.
+- MCP `search_corpus` removes personal data and checks the question length like the question field.
+
+### Review fixes, blocks C and D (done 2026-10-28)
+
+- Update Runs refresh the naive baseline collection too when a Source's text changes, so the evaluation's "naive" rows stay comparable; the eval's `hybrid` set-up now uses the app's keyword weight (`hybrid-full` is the first variant, at full weight).
+- Logs carry counts, not passage ids or the screening model's reply; uvicorn's own log lines go through the same JSON handler.
+- Documentation brought in line: README API table and status codes, test count, the Golden Set's draft status, screenshot gallery; the superseded plan's steps say what superseded them; `ANSWER_MODEL` removed; `.env.example` lists the settings a deployment needs; VISION.md carries a note that nothing was carried over from the other prototype and that hybrid search was measured.
+- Glossary words out of the interface and docs: "Regelwerke/Regimes" instead of "Themen/Topics", Compliance Officers instead of users or compliance teams, Rule Checks instead of tools, "declined" instead of "rejected".
+- The obligations table shows the Citation column the design brief promised; a click opens the Passage.
+- Code: one database engine (`db.py`), the Rule Check wiring in `rulechecks.py` (the evaluation scripts no longer import the web app), Provision links cached only when found and cleared after an Update Run, the registry and model list parsed once per file version, the dashboard query without Passage texts, a catch-all 500 handler that counts and never leaks the exception, the MCP server telling a database outage from a bad key. Frontend: one CSV helper, the keys and Operator sections in files of their own, dead strings and fields removed, hardcoded texts in `i18n.ts`, empty chart columns no longer keyboard stops.
+
 ## After the submission
 
-- Stored obligation list across sessions, then team features (shared lists, assignment, second review).
-- Automatic update runs with change records; full horizon scanning.
-- AML due-diligence level and sanctions screening tools; agentic search as a measured alternative.
-- Prompt-injection protection, refusals and escalation triggers; MCP server; rate limiting; analytics dashboard; user accounts.
+- Obligation tracker: status, owner and due date per obligation, with overdue and due-soon views; then team features (shared lists, assignment, second review).
+- Horizon scanning: watching BaFin and EUR-Lex for new documents.
+- AML due-diligence level and sanctions screening tools; agentic search and Graph RAG as measured alternatives; connecting tools from an external MCP server.
+- Escalation triggers; publishing the app and its MCP server on the internet.
 - Sustainability Regime (SFDR, taxonomy, CSRD).
 
 ## Earlier plan (2026-10-20), superseded by the submission plan above
@@ -145,27 +224,27 @@ Trust must-haves: links to the exact provision, legal status and "as of" dates, 
 - Decide the layout, the chat flow, how Passages, Citations and later tool results are shown; streaming answers; conversation history
 - Delivers: H5 in full; A conversation history and export; A help feature or guide
 
-### Step 3: Evaluation harness (todo)
+### Step 3: Evaluation harness (superseded by day 4 and E2)
 
 - Golden Set draft and review; retrieval metrics (hit@k, recall, MRR); answer metrics (faithfulness, citation validity)
 - Delivers: C evaluation of the RAG system; the basis for C A/B testing
 
-### Step 4: Retrieval upgrades (todo)
+### Step 4: Retrieval upgrades (superseded by day 1 and E1)
 
 - Structure-aware chunking (per article or paragraph), hybrid search, reranking, side-by-side strategy comparison measured on the Golden Set
 - Delivers: C hybrid search; C A/B testing of RAG strategies; A visualisation of the RAG process
 
-### Step 5: Firm Profile and tools (todo)
+### Step 5: Firm Profile and tools (superseded by day 2)
 
 - Firm Profile (licence type, size class, activities); tools: applicability check, compliance timeline, DORA incident classifier, AML due-diligence level, sanctions screening
 - Delivers: H2 (at least three tool calls); H3 domain-specific responses; B visualisation of tool call results; B multi-model support
 
-### Step 6: Safety, currency and updates (todo)
+### Step 6: Safety, currency and updates (superseded by E4 and E8)
 
 - Question pre-check (customer-data stripping, refusals, escalation to the money-laundering officer or counsel); prompt-injection protection; legal status and source currency; update run with change records and change detection per Source
 - Delivers: H3 security measures; B prompt injection protection; B real-time knowledge base updates; C automated knowledge base updates
 
-### Step 7: MCP, operations and polish (todo)
+### Step 7: MCP, operations and polish (superseded by E5, E6, E7 and E9)
 
 - MCP server for the tools; rate limiting and API key management; logging and monitoring; token usage and cost display; exports (PDF, CSV, JSON) that carry the notice; analytics dashboard; authentication if time allows
 - Delivers: C tools as MCP servers; B rate limiting; B logging; B token usage and costs; B export formats; C analytics dashboard; B authentication
