@@ -138,7 +138,8 @@ def test_answers_are_visible_only_to_their_owner(client):
     http, _ = client
     records = {"mine": {"id": "mine", "user_id": "u1"}, "guest": {"id": "guest", "user_id": None}}
     api.app.dependency_overrides[api.get_audit] = lambda: FakeAudit(records)
-    assert http.get("/api/history/guest").status_code == 200  # guests see guest answers
+    # a guest answer without a guest id (stored before 2026-10-28) belongs to nobody now
+    assert http.get("/api/history/guest").status_code == 404
     assert http.get("/api/history/mine").status_code == 404  # but not account answers
     http.post("/api/auth/register", json={"email": "a@b.de", "password": "long enough pw"})
     assert http.get("/api/history/mine").status_code == 200

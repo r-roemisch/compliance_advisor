@@ -12,6 +12,7 @@ The per-subject counters live in the process's memory and start again with it, w
 for one backend; the daily cost comes from the audit trail, so it survives restarts.
 """
 
+import hashlib
 import hmac
 import secrets
 import threading
@@ -105,6 +106,18 @@ def valid_guest_token(token: str | None) -> bool:
     return bool(raw) and hmac.compare_digest(_sign(raw), signature)
 
 
+def guest_identity(request: Request) -> str | None:
+    """What a guest's answers are filed under: a hash of the browser's signed guest token (the
+    one it sent, or the one this response sets), so a copy of the database holds no usable
+    cookie. None for a request without any guest token, such as a plain API call."""
+    token = request.cookies.get(GUEST_COOKIE)
+    if not valid_guest_token(token):
+        token = getattr(request.state, "guest_token", None)
+    if not token:
+        return None
+    return hashlib.sha256(token.encode()).hexdigest()[:32]
+
+
 def client_address(request: Request, trust_forwarded: bool) -> str:
     """The connecting address, or the last x-forwarded-for entry (the one a trusted reverse
     proxy appended) when the deployment says there is such a proxy."""
@@ -147,6 +160,7 @@ class GuestCookie:
             await self.app(scope, receive, send)
             return
         token = issue_guest_token()
+        scope.setdefault("state", {})["guest_token"] = token  # this request already counts as it
         value = (
             f"{GUEST_COOKIE}={token}; Path=/; Max-Age={GUEST_COOKIE_DAYS * 24 * 3600}; "
             "HttpOnly; SameSite=Lax" + ("; Secure" if self.secure else "")

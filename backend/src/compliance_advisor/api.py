@@ -27,7 +27,14 @@ from .apikeys import ApiKeyStore
 from .audit import AuditStore, to_markdown
 from .db import engine
 from .embeddings import get_embeddings
-from .limits import GuestCookie, RateLimiter, client_address, load_limits, subject_of
+from .limits import (
+    GuestCookie,
+    RateLimiter,
+    client_address,
+    guest_identity,
+    load_limits,
+    subject_of,
+)
 from .mcp_server import build_mcp_app
 from .models import ModelOption, chat_model, chat_models, list_price, load_models
 from .monitoring import EventStore, configure_logging, memory_errors
@@ -335,7 +342,11 @@ log = logging.getLogger("compliance_advisor.api")
 
 
 def _store(
-    audit: AuditStore | None, response: AskResponse, request: AskRequest, user: dict | None
+    audit: AuditStore | None,
+    response: AskResponse,
+    request: AskRequest,
+    user: dict | None,
+    http: Request,
 ) -> AskResponse:
     if audit is None:
         return response
@@ -345,6 +356,7 @@ def _store(
             request.profile.model_dump() if request.profile else None,
             user["id"] if user else None,
             user.get("api_key") if user else None,
+            None if user else guest_identity(http),
         )
     except SQLAlchemyError as e:
         log.warning("answer not stored in the audit trail: %s", e)
@@ -363,7 +375,7 @@ def ask(
     response = service.ask(
         request.question, request.top_k, request.profile, request.model, strategy=request.strategy
     )
-    return _store(audit, response, request, user)
+    return _store(audit, response, request, user, http)
 
 
 def _event(data: dict) -> str:
@@ -392,7 +404,7 @@ def ask_stream(
                 on_stage=lambda stage, data: events.put({"stage": stage, **data}),
                 strategy=request.strategy,
             )
-            response = _store(audit, response, request, user)
+            response = _store(audit, response, request, user, http)
             events.put({"stage": "done", "result": json.loads(response.model_dump_json())})
         except UpstreamError as e:
             _record_error(502, "/api/ask/stream")
@@ -433,7 +445,7 @@ def obligations(
     """Extracts the Obligations behind a stored answer and stores them with it. Counts against
     the same rate limit as a question, runs on the Answer Model the answer used (an EU-hosted
     answer stays in the EU, ADR 0007), and its cost is kept with the answer."""
-    record = history_item(answer_id, audit, user)
+    record = history_item(answer_id, audit, user, http)
     response = record["response"]
     if response.get("refusal") or not response["passages"]:
         return {"rows": [], "cost_usd": 0.0}  # nothing to extract from, no model call
@@ -502,24 +514,46 @@ def models() -> dict:
 def history(
     audit: Annotated[AuditStore | None, Depends(get_audit)],
     user: SessionUser,
+    http: Request,
     q: str = "",
     limit: int = 50,
 ) -> dict:
-    """Your own answers when logged in, the shared guest answers otherwise; `q` searches questions."""
+    """Your own answers when logged in, the answers asked from this browser otherwise; `q`
+    searches questions."""
     if audit is None:
         raise DatabaseError("the database is not reachable")
-    return {"items": audit.recent(user["id"] if user else None, q[:200], min(max(limit, 1), 200))}
+    return {
+        "items": audit.recent(
+            user["id"] if user else None,
+            q[:200],
+            min(max(limit, 1), 200),
+            guest_id=None if user else guest_identity(http),
+        )
+    }
+
+
+def _owns(record: dict | None, user: dict | None, http: Request) -> bool:
+    """An account owns its answers; a guest browser the ones asked from it. Nobody else: an
+    unknown id answers "not found", never "forbidden" (ADR 0005)."""
+    if record is None:
+        return False
+    if user:
+        return record.get("user_id") == user["id"]
+    guest = guest_identity(http)
+    return record.get("user_id") is None and guest is not None and record.get("guest_id") == guest
 
 
 @app.get("/api/history/{answer_id}")
 def history_item(
-    answer_id: str, audit: Annotated[AuditStore | None, Depends(get_audit)], user: SessionUser
+    answer_id: str,
+    audit: Annotated[AuditStore | None, Depends(get_audit)],
+    user: SessionUser,
+    http: Request,
 ) -> dict:
     if audit is None:
         raise DatabaseError("the database is not reachable")
     record = audit.get(answer_id)
-    owner = user["id"] if user else None
-    if record is None or record.get("user_id") != owner:  # other people's answers stay invisible
+    if not _owns(record, user, http):
         raise HTTPException(status_code=404, detail="No stored answer with this id")
     return record | {"changed_sources": _changed_sources(record.get("source_versions") or {})}
 
@@ -649,10 +683,11 @@ def export(
     answer_id: str,
     audit: Annotated[AuditStore | None, Depends(get_audit)],
     user: SessionUser,
+    http: Request,
     format: str = "md",
 ) -> Response:
     """The stored answer as Markdown or JSON, with Passages and Source versions."""
-    record = history_item(answer_id, audit, user)
+    record = history_item(answer_id, audit, user, http)
     name = f"compliance-advisor-{record['created_at']:%Y%m%d-%H%M%S}"
     if format == "json":
         body = json.dumps(record, default=str, ensure_ascii=False, indent=2)

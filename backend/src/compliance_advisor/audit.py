@@ -13,6 +13,7 @@ from sqlalchemy import (
     String,
     Table,
     Text,
+    false,
     func,
     literal_column,
     select,
@@ -38,6 +39,7 @@ answers = Table(
     Column("obligations", JSONB),  # rows from "Extract Obligations", if run
     Column("user_id", String(36), index=True),  # the account that asked; empty for guests
     Column("api_key", String(100)),  # the name of the API key used, if any
+    Column("guest_id", String(32), index=True),  # the guest browser that asked (hashed token)
     Column("obligations_cost", Float),  # what "Extract Obligations" cost, if run
 )
 
@@ -81,6 +83,12 @@ class AuditStore:
             connection.execute(
                 text("alter table answers add column if not exists obligations_cost float")
             )
+            connection.execute(
+                text("alter table answers add column if not exists guest_id varchar(32)")
+            )
+            connection.execute(
+                text("create index if not exists ix_answers_guest_id on answers (guest_id)")
+            )
 
     def save(
         self,
@@ -88,6 +96,7 @@ class AuditStore:
         profile: dict | None,
         user_id: str | None = None,
         api_key: str | None = None,
+        guest_id: str | None = None,
     ) -> AskResponse:
         response = response.model_copy(
             update={"id": str(uuid.uuid4()), "created_at": datetime.now(UTC)}
@@ -105,6 +114,7 @@ class AuditStore:
                     source_versions=versions,
                     user_id=user_id,
                     api_key=api_key,
+                    guest_id=guest_id,
                 )
             )
         return response
@@ -132,11 +142,22 @@ class AuditStore:
             )
 
     @staticmethod
-    def _owned_by(user_id: str | None):
-        """Answers of this account, or the shared guest answers when nobody is logged in."""
-        return answers.c.user_id == user_id if user_id else answers.c.user_id.is_(None)
+    def _owned_by(user_id: str | None, guest_id: str | None = None):
+        """Answers of this account; for a guest, the answers asked from the same browser. A
+        request without any guest identity owns nothing (ADR 0005, amended 2026-10-28)."""
+        if user_id:
+            return answers.c.user_id == user_id
+        if guest_id:
+            return (answers.c.user_id.is_(None)) & (answers.c.guest_id == guest_id)
+        return false()
 
-    def recent(self, user_id: str | None = None, search: str = "", limit: int = 50) -> list[dict]:
+    def recent(
+        self,
+        user_id: str | None = None,
+        search: str = "",
+        limit: int = 50,
+        guest_id: str | None = None,
+    ) -> list[dict]:
         query = select(
             answers.c.id,
             answers.c.created_at,
@@ -145,7 +166,7 @@ class AuditStore:
             (answers.c.obligations.isnot(None)).label("has_obligations"),
             (answers.c.response["refusal"].astext.isnot(None)).label("refused"),
             answers.c.api_key,
-        ).where(self._owned_by(user_id))
+        ).where(self._owned_by(user_id, guest_id))
         if search.strip():
             query = query.where(answers.c.question.ilike(f"%{search.strip()}%"))
         query = query.order_by(answers.c.created_at.desc()).limit(limit)

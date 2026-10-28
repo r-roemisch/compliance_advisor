@@ -33,7 +33,10 @@ def _record(**response):
         "cited": [1],
         "model": "mistralai/mistral-large-4-0",
     }
-    return {"id": "a1", "user_id": None, "response": base | response}
+    return {"id": "a1", "user_id": "u1", "guest_id": None, "response": base | response}
+
+
+OWNER = {"id": "u1", "email": "a@b.de", "name": "", "profile": None}
 
 
 def _fail(*args, **kwargs):
@@ -43,6 +46,7 @@ def _fail(*args, **kwargs):
 def test_refused_answers_are_not_sent_to_a_model(monkeypatch):
     audit = FakeAudit(_record(refusal="off_topic", passages=[], cited=[]))
     api.app.dependency_overrides[api.get_audit] = lambda: audit
+    api.app.dependency_overrides[api.current_user] = lambda: OWNER
     monkeypatch.setattr(api, "chat_model", _fail)
     body = TestClient(api.app).post("/api/history/a1/obligations").json()
     assert body == {"rows": [], "cost_usd": 0.0} and audit.saved is None
@@ -51,6 +55,7 @@ def test_refused_answers_are_not_sent_to_a_model(monkeypatch):
 def test_extraction_uses_the_answers_own_model_and_keeps_its_cost(monkeypatch):
     audit = FakeAudit(_record())
     api.app.dependency_overrides[api.get_audit] = lambda: audit
+    api.app.dependency_overrides[api.current_user] = lambda: OWNER
     chosen = []
     monkeypatch.setattr(api, "chat_model", lambda option, settings: chosen.append(option.id))
     monkeypatch.setattr(
@@ -71,13 +76,14 @@ def test_extraction_uses_the_answers_own_model_and_keeps_its_cost(monkeypatch):
 def test_extraction_counts_against_the_rate_limit(monkeypatch):
     audit = FakeAudit(_record())
     api.app.dependency_overrides[api.get_audit] = lambda: audit
+    api.app.dependency_overrides[api.current_user] = lambda: OWNER
     monkeypatch.setattr(api, "chat_model", lambda option, settings: "model")
     monkeypatch.setattr(
         api, "extract_obligations", lambda model, q, p, c: ([], AIMessage(content=""))
     )
     client = TestClient(api.app)
-    limit = api._limiter().limits.guest_per_hour
-    for _ in range(limit + 1):  # the first one counts against the address, then the cookie
+    limit = api._limiter().limits.account_per_hour
+    for _ in range(limit):  # the account's hourly budget, shared with its questions
         assert client.post("/api/history/a1/obligations").status_code == 200
     assert client.post("/api/history/a1/obligations").status_code == 429
 

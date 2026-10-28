@@ -209,6 +209,12 @@ Nine steps from `soft_requirements.txt`, decided in the design session of 2026-1
 - The obligations table shows the Citation column the design brief promised; a click opens the Passage.
 - Code: one database engine (`db.py`), the Rule Check wiring in `rulechecks.py` (the evaluation scripts no longer import the web app), Provision links cached only when found and cleared after an Update Run, the registry and model list parsed once per file version, the dashboard query without Passage texts, a catch-all 500 handler that counts and never leaks the exception, the MCP server telling a database outage from a bad key. Frontend: one CSV helper, the keys and Operator sections in files of their own, dead strings and fields removed, hardcoded texts in `i18n.ts`, empty chart columns no longer keyboard stops.
 
+### Private guest histories (done 2026-10-28)
+
+- Guests no longer share one history: a guest's answers are filed under a hash of the browser's signed guest cookie, so the history, a stored answer and its export are visible only from that browser (ADR 0005, amended). Guest answers stored before have no guest id and are visible to nobody. Found while rehearsing for the review: the shared guest history contradicted the app's own privacy message.
+- The dashboard for guests is a page of its own, "Nur mit Konto", with "Konto erstellen" and "Anmelden" buttons (the dialog opens on the matching tab); before, a guest's click on Dashboard bounced straight back to Research because the new session-expiry handler mistook a guest's 401 for an ended session.
+- Clean install checked from the pushed commit: `docker compose up --build`, health, one question through the whole stack.
+
 ## After the submission
 
 - Obligation tracker: status, owner and due date per obligation, with overdue and due-soon views; then team features (shared lists, assignment, second review).
