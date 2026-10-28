@@ -29,6 +29,24 @@ Built as a Turing College bootcamp project. German interface by default, English
 - **Accounts and dashboard** (optional): sign up with email and password; your questions, answers and Firm Profile stay private to you. The dashboard has five sections. The overview covers 7, 30 or 90 days or every question: key figures, questions per day, most-asked regimes, the **most-cited provisions** and the **blind spots** (sources that apply to your Firm Profile but never came up in your questions, each with a ready question). Every bar and provision opens the questions behind it. The other sections: a searchable table of all your questions, all your extracted obligations in one table with CSV export, the upcoming dates for your Firm Profile, and profile and account settings. Deleting the account deletes its answers.
 - **Model choice** including an EU-hosted model (Mistral Large 4 on Mistral AI's own servers), with tokens and cost shown for every answer.
 
+### A typical session
+
+```mermaid
+flowchart TD
+    P["Choose a Firm Profile (optional)"] --> Q["Ask a question<br/>model and search strategy optional"]
+    P --> T["Timeline: dated milestones<br/>for the profile"]
+    Q --> C{"Pre-check"}
+    C -->|manipulation or off-topic| R["Refused, with the reason"]
+    C -->|accepted| S["Steps appear as they happen:<br/>search, rule checks, writing"]
+    S --> A["Answer with a citation<br/>for every statement"]
+    A --> O["Open the cited passage<br/>and the official text"]
+    A --> X["Extract obligations<br/>as a table and CSV"]
+    A --> E["Export for the audit trail<br/>Markdown, JSON, PDF"]
+    A --> H["Saved to the history"]
+    H --> D["Dashboard with an account:<br/>most-cited provisions,<br/>blind spots, changed sources"]
+    D -.->|ready question for a blind spot| Q
+```
+
 | Answer being written | Rule check | Obligations |
 |---|---|---|
 | ![Progress steps and the answer appearing](docs/screenshots/progress.png) | ![DORA incident classification](docs/screenshots/rule-check.png) | ![Obligations table](docs/screenshots/obligations.png) |
@@ -64,10 +82,37 @@ A five-minute walkthrough for a demo is in [`docs/DEMO.md`](docs/DEMO.md).
 
 ## How it works
 
-```
- Browser ──/api/*──▶ Next.js (:3010) ──▶ FastAPI (:8010) ──▶ OpenRouter: embeddings, Answer Model
-                     server-sent events      │
-                                             └──▶ Postgres + pgvector (:5433): passages, answers
+```mermaid
+sequenceDiagram
+    actor U as Compliance Officer
+    participant FE as Next.js (:3010)
+    participant API as FastAPI (:8010)
+    participant OR as OpenRouter
+    participant DB as Postgres + pgvector (:5433)
+
+    U->>FE: Question, Firm Profile, model, search strategy
+    FE->>API: POST /api/ask/stream
+    Note over API: Pre-check removes IBANs, email addresses, phone numbers
+    API->>OR: Screening call: manipulation or off-topic?
+    alt refused
+        API-->>FE: Refusal with the reason
+        FE-->>U: The reason is shown
+    else accepted
+        API->>OR: Embed the question
+        API->>DB: Search: provisions named in the question, then the most similar passages
+        API-->>FE: Step events (server-sent): search, found
+        API->>OR: Answer Model: rules, passages, Firm Profile
+        opt The question needs an exact result
+            OR-->>API: Rule check calls
+            Note over API: Rule checks run in code: applicability, timeline, DORA incident, AI Act risk class
+            API->>OR: Rule check results
+        end
+        OR-->>API: Answer, streamed
+        API-->>FE: Answer text as it is written
+        API->>DB: Store answer, passages, source versions
+        API-->>FE: Done: answer with citations and trace
+        FE-->>U: Answer next to the original sources
+    end
 ```
 
 **Indexing**, once per source: the fetch command downloads each file from its official publisher (checking robots.txt). A loader per format cuts it into **provisions**: articles, recitals and annexes of EU acts, § of German acts, numbered sections of BaFin circulars. Long provisions are split into parts that keep their label. Each passage is embedded with `text-embedding-3-small` and stored with its provision label, link, legal status, version and download date.
