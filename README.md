@@ -257,38 +257,6 @@ cd ../frontend && npm install && npm run dev           # page on :3010, /api for
 
 Errors come back as `{"detail": "..."}`: 401 without a valid session or key, 403 for an API key on an account endpoint or a non-operator on an operator endpoint, 404 for an answer or key that is not yours, 409 when an update run is already in progress, 422 for invalid input, 429 when a rate limit or the daily cost ceiling is reached (`Retry-After` and `X-Limit` headers), 500 for anything unforeseen (counted for the operator, never with the exception's text), 502 when OpenRouter does not respond, 503 when the database is not reachable.
 
-## Bootcamp requirements
-
-| Requirement | Where |
-|---|---|
-| **1. RAG**: knowledge base, embeddings, chunking, similarity search | 18 sources; per-provision chunking with a naive fixed-size baseline; `text-embedding-3-small`; pgvector cosine search, optionally merged with Postgres keyword search |
-| **2. Tool calling**: at least three domain tools | four rule checks the model calls (applicability, timeline, DORA incident, AI Act use case) |
-| **3. Domain specialisation** and security | German financial supervision; prompts for compliance professionals; pre-check for personal data; no uploads; passages treated as data, not instructions |
-| **4. LangChain with OpenRouter**, error handling, input validation | `langchain-openai` against OpenRouter; 422/502/503 with clear messages; question length and profile validated |
-| **5. Next.js interface**: context and sources, tool results, progress | citations linked to passages; rule-check cards; live progress steps and streamed answer |
-
-| Optional | Status |
-|---|---|
-| Conversation history and export | yes: history, Markdown, JSON, PDF via print; obligations as CSV |
-| Source citations | yes |
-| Visualisation of the RAG process | yes: live steps while answering, and under every answer "How this answer was found" with every step's numbers and details, stored with the answer |
-| Help feature | partly: start screen with explanation and example questions |
-| Multi-model support | yes: GPT-6 Luna, Mistral Large 4 (EU), Claude Sonnet 5.5 |
-| Token usage and costs | yes, per answer |
-| Visualisation of tool results | yes, one card layout per rule check |
-| Prompt-injection protection | yes: pre-check screening of every question with a measured test set (30 of 30 attacks refused, 0 of 244 legitimate questions refused), refusals with reasons; see the section above |
-| Authentication and personalisation | yes: optional accounts (email and password), Firm Profile saved to the account, dashboard, private searchable archive |
-| Logging and monitoring | yes: JSON logs without question texts, failed requests counted, operations page with figures across all accounts |
-| Multi-language support | yes: German and English interface; answers in the question's language; sources in both languages |
-| A/B testing of RAG strategies | yes, offline: five retrieval set-ups compared on the Golden Set |
-| Evaluation of the RAG system | yes: own retrieval and answer metrics, and RAGAs faithfulness and factual correctness on a fixed sample, logged per run |
-| Analytics dashboard | yes: per account (period switch, questions per day, regimes, most-cited provisions, blind spots, changed sources; every bar opens the questions behind it) and an operations page across all accounts for operators |
-| Hybrid search | yes, as a choice per question: Postgres keyword search (German and English stemming) merged with vector search by reciprocal rank fusion; measured on the Golden Set and not the default, because it lost to vector search |
-| Real-time data updates and automated knowledge-base updates | yes: nightly update run (or "check now") that re-downloads every source, reloads only changed ones and keeps a change record; changed sources are flagged on the dashboard and on reopened answers |
-| Rate limiting and API key management | yes: per-account API keys (hashed, revocable, ask-only), limits per guest browser and per account, daily cost ceiling |
-| Tools as MCP servers | yes: the four rule checks and a corpus search at `/mcp` (streamable HTTP, API key) |
-| Not done | connecting tools from an external MCP server |
-
 ## Documentation
 
 | File | Contents |
