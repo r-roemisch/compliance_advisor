@@ -62,6 +62,16 @@ class TraceHit(BaseModel):
     rank: int | None = None  # position in the keyword ranking
 
 
+class TranslationTrace(BaseModel):
+    """Query Translation (CONTEXT.md): the question in the Corpus's other language, and what
+    searching it found."""
+
+    query: str
+    language: str = ""  # de | en: the language the question was translated into
+    vector: list[TraceHit] = []
+    keyword: list[TraceHit] = []  # hybrid only
+
+
 class Trace(BaseModel):
     """The Answer Trace (CONTEXT.md): every step from question to answer, stored with it."""
 
@@ -70,11 +80,13 @@ class Trace(BaseModel):
     named_hits: list[TraceHit] = []
     vector: list[TraceHit] = []  # candidates of the vector search, best first
     keyword: list[TraceHit] = []  # candidates of the keyword search (hybrid only)
-    merged: list[str] = []  # passage ids after rank fusion (hybrid only)
+    translation: TranslationTrace | None = None  # with Query Translation
+    merged: list[str] = []  # passage ids after rank fusion (hybrid or Query Translation)
     max_per_source: int = 0
     capped_out: int = 0  # candidates the per-Source cap held back
-    found_by: dict[str, str] = {}  # final passage id -> named | vector | keyword | both
-    seconds: dict[str, float] = {}  # search, answer (model and Rule Checks), total
+    # final passage id -> named | vector | keyword | both | translation (found only by it)
+    found_by: dict[str, str] = {}
+    seconds: dict[str, float] = {}  # search, translation, answer (model and Rule Checks), total
 
 
 class AskResponse(BaseModel):

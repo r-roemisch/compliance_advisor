@@ -1,5 +1,7 @@
 """Retriever: question in, the most relevant Passages out. Two Search Strategies: vector search
-(cosine similarity in pgvector) and hybrid search (vector search merged with keyword search)."""
+(cosine similarity in pgvector) and hybrid search (vector search merged with keyword search).
+With Query Translation (query_translation.py), the question's translation is searched the same
+way and all rankings are merged."""
 
 import re
 from dataclasses import dataclass
@@ -133,13 +135,28 @@ class Retriever:
             for document, metadata, distance in rows
         ]
 
-    def retrieve(self, question: str, k: int, strategy: str = "vector") -> list[RetrievedPassage]:
-        return self.search(question, k, strategy)[0]
+    def _rankings(
+        self, query: str, vector: list[float], k: int, hybrid: bool
+    ) -> tuple[list[RetrievedPassage], list[RetrievedPassage]]:
+        """What one query finds: by vector search, and for hybrid search by keyword search."""
+        by_vector = self._search(vector, k)
+        if not hybrid:
+            return by_vector, []
+        only = None
+        if self.keyword_scope == "candidates":
+            only = [hit.document.metadata["passage_id"] for hit in by_vector]
+        return by_vector, self._keyword_search(query, vector, k, only)
+
+    def retrieve(
+        self, question: str, k: int, strategy: str = "vector", translation: str | None = None
+    ) -> list[RetrievedPassage]:
+        return self.search(question, k, strategy, translation)[0]
 
     def search(
-        self, question: str, k: int, strategy: str = "vector"
+        self, question: str, k: int, strategy: str = "vector", translation: str | None = None
     ) -> tuple[list[RetrievedPassage], dict]:
-        """The Passages, and the Answer Trace of how they were found (schemas.Trace)."""
+        """The Passages, and the Answer Trace of how they were found (schemas.Trace). With a
+        `translation` of the question, both are searched and their rankings merged."""
         if strategy not in SEARCH_STRATEGIES:
             raise ValueError(f"unknown search strategy {strategy!r}")
         vector = self.store.embeddings.embed_query(question)  # once, for every search below
@@ -148,15 +165,23 @@ class Retriever:
         for label in labels:
             named += self._search(vector, 2, filter={"provision": {"$eq": label}})
         hybrid = strategy == "hybrid"
-        fetch = max(k, self.candidates) if self.max_per_source or hybrid else k
-        by_vector = self._search(vector, fetch)
-        ranked, keyword = by_vector, []
-        if hybrid:
-            only = None
-            if self.keyword_scope == "candidates":
-                only = [hit.document.metadata["passage_id"] for hit in by_vector]
-            keyword = self._keyword_search(question, vector, fetch, only)
-            ranked = merge_ranked(by_vector, keyword, weights=(1.0, self.keyword_weight))
+        merge = hybrid or bool(translation)
+        fetch = max(k, self.candidates) if self.max_per_source or merge else k
+        by_vector, keyword = self._rankings(question, vector, fetch, hybrid)
+        translated_vector, translated_keyword = [], []
+        if translation:
+            translated_vector, translated_keyword = self._rankings(
+                translation, self.store.embeddings.embed_query(translation), fetch, hybrid
+            )
+        ranked = by_vector
+        if merge:  # the question's rankings first, so a Passage it found keeps its own score
+            ranked = merge_ranked(
+                by_vector,
+                keyword,
+                translated_vector,
+                translated_keyword,
+                weights=(1.0, self.keyword_weight, 1.0, self.keyword_weight),
+            )
         capped = cap_per_source(ranked, k, self.max_per_source)
         kept = named[: k // 2]  # named Provisions take at most half the slots
         seen = {hit.document.metadata["passage_id"] for hit in kept}
@@ -173,7 +198,18 @@ class Retriever:
             "named_hits": [_trace_hit(h) for h in named],
             "vector": [_trace_hit(h) for h in by_vector],
             "keyword": [_trace_hit(h, rank=n) for n, h in enumerate(keyword, start=1)],
-            "merged": ids(ranked) if hybrid else [],
+            "translation": (
+                {
+                    "query": translation,
+                    "vector": [_trace_hit(h) for h in translated_vector],
+                    "keyword": [
+                        _trace_hit(h, rank=n) for n, h in enumerate(translated_keyword, start=1)
+                    ],
+                }
+                if translation
+                else None
+            ),
+            "merged": ids(ranked) if merge else [],
             "max_per_source": self.max_per_source,
             "capped_out": sum(1 for h in ranked[:k] if h not in capped),
             "found_by": {
@@ -185,6 +221,8 @@ class Retriever:
                     else "keyword"
                     if pid in in_keyword
                     else "vector"
+                    if pid in in_vector
+                    else "translation"  # only the translated query found it
                 )
                 for pid in ids(final)
             },

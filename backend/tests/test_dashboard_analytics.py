@@ -6,7 +6,8 @@ from datetime import UTC, date, datetime
 import pytest
 from fastapi.testclient import TestClient
 
-from compliance_advisor import analytics, api
+from compliance_advisor import analytics
+from compliance_advisor.api import app, deps
 from compliance_advisor.registry import Source
 from compliance_advisor.tools import RegimeFinding
 
@@ -127,12 +128,12 @@ class FakeAudit:
 @pytest.fixture
 def signed_in(monkeypatch):
     accounts = FakeAccounts()
-    monkeypatch.setattr(api, "get_accounts", lambda: accounts)
-    api.app.dependency_overrides[api.get_audit] = lambda: FakeAudit(RECORDS)
-    http = TestClient(api.app)
+    monkeypatch.setattr(deps, "get_accounts", lambda: accounts)
+    app.dependency_overrides[deps.get_audit] = lambda: FakeAudit(RECORDS)
+    http = TestClient(app)
     http.post("/api/auth/register", json={"email": "a@b.de", "password": "long enough pw"})
     yield http, accounts
-    api.app.dependency_overrides.clear()
+    app.dependency_overrides.clear()
 
 
 def test_dashboard_reports_the_period_and_blind_spots_need_a_profile(signed_in):

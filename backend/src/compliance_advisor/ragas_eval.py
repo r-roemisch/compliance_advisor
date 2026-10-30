@@ -23,7 +23,7 @@ import statistics
 from datetime import UTC, datetime
 
 from .evaluation import RESULTS, GoldenItem, load_golden, make_retriever, write_report
-from .models import chat_models, list_price, load_models
+from .models import chat_models, helper_models, list_price, load_models, system_prompts
 from .settings import OPENROUTER_BASE_URL, PROJECT_ROOT, get_settings
 
 METRICS = ("faithfulness", "factual_correctness")
@@ -183,8 +183,21 @@ async def run(args) -> dict:
     models = chat_models(settings)
     model_id = args.model or load_models(settings.models_file)[0].id
     retriever, _ = make_retriever("app", settings, get_embeddings(settings))
+    translate = (
+        settings.query_translation if args.query_translation is None else args.query_translation
+    )
     service = AnswerService(
-        retriever, models, model_id, args.k, tool_factory, list_price, strategy=args.strategy
+        retriever,
+        models,
+        model_id,
+        args.k,
+        tool_factory,
+        list_price,
+        strategy=args.strategy,
+        prompts=system_prompts(settings.models_file),
+        translators=(
+            helper_models(settings, models, settings.translation_model) if translate else None
+        ),
     )
     meter = Meter()
     metrics = {}
@@ -243,6 +256,7 @@ async def run(args) -> dict:
     return {
         "answer_model": model_id,
         "strategy": args.strategy,
+        "query_translation": translate,
         "n": len(rows),
         "planned": len(chosen),
         "graders": summarise(rows, args.graders),
@@ -260,6 +274,11 @@ def main() -> None:
     parser.add_argument("--n", type=int, default=50, help="questions in the sample (default 50)")
     parser.add_argument("--model", help="Answer Model id (default: the first in models.yaml)")
     parser.add_argument("--strategy", choices=["vector", "hybrid"], default="vector")
+    parser.add_argument(
+        "--query-translation",
+        action=argparse.BooleanOptionalAction,
+        help="search the question's translation as well (default: as the app, QUERY_TRANSLATION)",
+    )
     parser.add_argument(
         "--graders", nargs="+", default=[DEFAULT_GRADER], help="one grader, or two to compare"
     )

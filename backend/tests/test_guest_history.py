@@ -5,8 +5,8 @@ import hashlib
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage
 
-from compliance_advisor import api
 from compliance_advisor.answer import AnswerService
+from compliance_advisor.api import app, deps
 from compliance_advisor.limits import issue_guest_token
 
 from .test_answering import FakeModel, FakeRetriever
@@ -46,15 +46,15 @@ class FakeAudit:
 
 def _app(audit):
     service = AnswerService(FakeRetriever(), FakeModel(AIMessage(content="Yes [1].")), "m", top_k=6)
-    api.app.dependency_overrides[api.get_service] = lambda: service
-    api.app.dependency_overrides[api.get_audit] = lambda: audit
-    api.app.dependency_overrides[api.current_user] = lambda: None
+    app.dependency_overrides[deps.get_service] = lambda: service
+    app.dependency_overrides[deps.get_audit] = lambda: audit
+    app.dependency_overrides[deps.current_user] = lambda: None
     return audit
 
 
 def test_a_guests_first_answer_is_filed_under_the_cookie_the_response_sets():
     audit = _app(FakeAudit())
-    browser = TestClient(api.app)
+    browser = TestClient(app)
     response = browser.post("/api/ask", json={"question": "Major incidents?"})
     assert response.status_code == 200
     token = browser.cookies.get("ca_guest")
@@ -66,9 +66,9 @@ def test_a_guests_first_answer_is_filed_under_the_cookie_the_response_sets():
 
 def test_another_browser_sees_neither_the_list_nor_the_answer():
     _app(FakeAudit())
-    browser_a = TestClient(api.app)
+    browser_a = TestClient(app)
     browser_a.post("/api/ask", json={"question": "Major incidents?"})
-    browser_b = TestClient(api.app)
+    browser_b = TestClient(app)
     assert browser_b.get("/api/history").json()["items"] == []
     assert browser_b.get("/api/history/a1").status_code == 404
     assert browser_b.get("/api/history/a1/export").status_code == 404
@@ -79,15 +79,15 @@ def test_another_browser_sees_neither_the_list_nor_the_answer():
 
 def test_guest_answers_are_invisible_to_accounts_and_the_other_way_round():
     audit = _app(FakeAudit())
-    browser = TestClient(api.app)
+    browser = TestClient(app)
     browser.post("/api/ask", json={"question": "Major incidents?"})
-    api.app.dependency_overrides[api.current_user] = lambda: {
+    app.dependency_overrides[deps.current_user] = lambda: {
         "id": "u1",
         "email": "a@b.de",
         "name": "",
         "profile": None,
     }
-    signed_in = TestClient(api.app)
+    signed_in = TestClient(app)
     signed_in.cookies.set("ca_guest", issue_guest_token())
     assert signed_in.get("/api/history").json()["items"] == []
     assert signed_in.get("/api/history/a1").status_code == 404

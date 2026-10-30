@@ -1,6 +1,6 @@
 """The app's Rule Checks wired to the Corpus: the link of a Provision label, and the tool
-factory the Answer Model and the MCP server use. Lives apart from api.py so the evaluation
-scripts can import it without building the web app."""
+factory the Answer Model and the MCP server use. Lives apart from the api package so the
+evaluation scripts can import it without building the web app."""
 
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError

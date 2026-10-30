@@ -2,12 +2,9 @@
 
 Two sources: the audit trail (one row per answer, with model, Search Strategy, cost, seconds and
 whether the Pre-Check refused it) and an events table for what the audit trail cannot hold,
-such as failed requests. Logs are structured (one JSON object per line) and carry no question
-text either.
+such as failed requests. The log lines (logs.py) carry no question text either.
 """
 
-import json
-import logging
 import uuid
 from collections import Counter, defaultdict
 from datetime import UTC, date, datetime, timedelta
@@ -30,30 +27,6 @@ events = Table(
     Column("kind", String(40), nullable=False),  # error | update_run
     Column("data", JSONB, nullable=False),  # figures and codes only, no question text
 )
-
-
-class JsonFormatter(logging.Formatter):
-    """One JSON object per log line, so a log collector can read fields without parsing."""
-
-    def format(self, record: logging.LogRecord) -> str:
-        entry = {
-            "ts": datetime.fromtimestamp(record.created, UTC).isoformat(timespec="milliseconds"),
-            "level": record.levelname,
-            "logger": record.name,
-            "message": record.getMessage(),
-        }
-        if record.exc_info:
-            entry["exception"] = self.formatException(record.exc_info)
-        return json.dumps(entry, ensure_ascii=False)
-
-
-def configure_logging(fmt: str) -> None:
-    handler = logging.StreamHandler()
-    if fmt == "json":
-        handler.setFormatter(JsonFormatter())
-    else:
-        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
-    logging.basicConfig(level=logging.INFO, handlers=[handler], force=True)
 
 
 class EventStore:

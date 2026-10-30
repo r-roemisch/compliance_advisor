@@ -3,8 +3,8 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from compliance_advisor import api
 from compliance_advisor.accounts import COOKIE, AccountError, hash_password, public, verify_password
+from compliance_advisor.api import app, deps
 
 
 def test_password_hashes_are_salted_and_verifiable():
@@ -75,9 +75,9 @@ class FakeAudit:
 @pytest.fixture
 def client(monkeypatch):
     accounts = FakeAccounts()
-    monkeypatch.setattr(api, "get_accounts", lambda: accounts)
-    api.app.dependency_overrides.clear()
-    return TestClient(api.app), accounts
+    monkeypatch.setattr(deps, "get_accounts", lambda: accounts)
+    app.dependency_overrides.clear()
+    return TestClient(app), accounts
 
 
 def test_register_sets_an_httponly_cookie_and_me_returns_the_user(client):
@@ -137,7 +137,7 @@ def test_profile_is_saved_with_the_account_and_requires_login(client):
 def test_answers_are_visible_only_to_their_owner(client):
     http, _ = client
     records = {"mine": {"id": "mine", "user_id": "u1"}, "guest": {"id": "guest", "user_id": None}}
-    api.app.dependency_overrides[api.get_audit] = lambda: FakeAudit(records)
+    app.dependency_overrides[deps.get_audit] = lambda: FakeAudit(records)
     # a guest answer without a guest id (stored before 2026-10-28) belongs to nobody now
     assert http.get("/api/history/guest").status_code == 404
     assert http.get("/api/history/mine").status_code == 404  # but not account answers
@@ -147,4 +147,4 @@ def test_answers_are_visible_only_to_their_owner(client):
     http.post("/api/auth/logout")
     http.post("/api/auth/register", json={"email": "c@d.de", "password": "long enough pw"})
     assert http.get("/api/history/mine").status_code == 404  # another account
-    api.app.dependency_overrides.clear()
+    app.dependency_overrides.clear()

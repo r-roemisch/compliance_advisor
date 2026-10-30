@@ -3,7 +3,7 @@
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage
 
-from compliance_advisor import api
+from compliance_advisor.api import app
 from compliance_advisor.obligations import ExtractedRow, Extraction, extract_obligations
 
 PASSAGES = [
@@ -68,7 +68,7 @@ def test_language_follows_the_question():
 
 
 def test_timeline_can_be_narrowed_to_the_firm_profile():
-    client = TestClient(api.app)
+    client = TestClient(app)
     everything = client.post("/api/timeline", json={}).json()
     reinsurer = client.post("/api/timeline", json={"profile": {"firm_type": "reinsurer"}}).json()
     sources_all = {e["source"] for e in everything["entries"]}

@@ -275,6 +275,9 @@ def to_markdown(record: dict) -> str:
         )
     if r.get("redactions"):
         lines.append(f"- Removed by the pre-check: {', '.join(r['redactions'])}")
+    if translation := (r.get("trace") or {}).get("translation"):
+        language = translation.get("language") or "other language"
+        lines.append(f"- Also searched as ({language}): {translation['query']}")
     if r.get("refusal"):
         lines += [
             "",

@@ -5,7 +5,7 @@ import types
 
 from fastapi.testclient import TestClient
 
-from compliance_advisor import api
+from compliance_advisor.api import app, deps
 
 HEADERS = {"accept": "application/json, text/event-stream", "content-type": "application/json"}
 
@@ -30,10 +30,10 @@ def test_mcp_requires_an_api_key(monkeypatch):
         def user_for(self, secret):
             return {"id": "u1", "email": "a@b.de", "api_key": "ci"} if secret == "ca_good" else None
 
-    monkeypatch.setattr(api, "get_api_keys", lambda: Keys())
+    monkeypatch.setattr(deps, "get_api_keys", lambda: Keys())
     retriever = FakeRetriever()
-    monkeypatch.setattr(api, "get_service", lambda: types.SimpleNamespace(retriever=retriever))
-    with TestClient(api.app) as client:
+    monkeypatch.setattr(deps, "get_service", lambda: types.SimpleNamespace(retriever=retriever))
+    with TestClient(app) as client:
         assert _rpc(client, None, "tools/list").status_code == 401
         assert _rpc(client, "ca_bad", "tools/list").status_code == 401
         response = _rpc(client, "ca_good", "tools/list")

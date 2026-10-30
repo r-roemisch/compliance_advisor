@@ -6,8 +6,8 @@ from datetime import UTC, datetime
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage, AIMessageChunk
 
-from compliance_advisor import api
 from compliance_advisor.answer import AnswerService, _usage, split_coverage
+from compliance_advisor.api import app, deps
 from compliance_advisor.audit import to_markdown
 from compliance_advisor.schemas import AskResponse
 from tests.test_tools import OnePassage
@@ -65,9 +65,9 @@ def test_markdown_export_lists_question_passages_and_source_versions():
 
 def test_stream_reports_each_step_then_the_result():
     service = AnswerService(OnePassage(), PlainModel(), "m", top_k=6)
-    api.app.dependency_overrides[api.get_service] = lambda: service
-    api.app.dependency_overrides[api.get_audit] = lambda: None
-    with TestClient(api.app).stream(
+    app.dependency_overrides[deps.get_service] = lambda: service
+    app.dependency_overrides[deps.get_audit] = lambda: None
+    with TestClient(app).stream(
         "POST", "/api/ask/stream", json={"question": "Does DORA apply?"}
     ) as r:
         events = [json.loads(line[6:]) for line in r.iter_lines() if line.startswith("data: ")]
@@ -79,9 +79,9 @@ def test_stream_reports_each_step_then_the_result():
 
 def test_stream_reports_an_unknown_model_as_an_error_event():
     service = AnswerService(OnePassage(), PlainModel(), "m", top_k=6)
-    api.app.dependency_overrides[api.get_service] = lambda: service
-    api.app.dependency_overrides[api.get_audit] = lambda: None
-    with TestClient(api.app).stream(
+    app.dependency_overrides[deps.get_service] = lambda: service
+    app.dependency_overrides[deps.get_audit] = lambda: None
+    with TestClient(app).stream(
         "POST", "/api/ask/stream", json={"question": "Does DORA apply?", "model": "nope"}
     ) as r:
         events = [json.loads(line[6:]) for line in r.iter_lines() if line.startswith("data: ")]
@@ -89,10 +89,10 @@ def test_stream_reports_an_unknown_model_as_an_error_event():
 
 
 def test_model_list_offers_an_eu_hosted_option():
-    models = TestClient(api.app).get("/api/models").json()["models"]
+    models = TestClient(app).get("/api/models").json()["models"]
     assert models[0]["id"] == "openai/gpt-6-luna"
     assert any(m["eu_hosted"] for m in models)
-    assert all("provider_only" not in m for m in models)
+    assert all("provider_only" not in m and "system_prompt" not in m for m in models)
 
 
 class StreamingModel:

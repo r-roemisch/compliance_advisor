@@ -51,12 +51,14 @@ export type FirmProfile = { firm_type: string; size: string; customers: string; 
 export type Preset = { id: string; label: Record<Lang, string>; profile: FirmProfile };
 export type SearchStrategy = "vector" | "hybrid";
 export type TraceHit = { passage_id: string; provision: string; short_title: string; score: number | null; rank: number | null };
+export type TranslationTrace = { query: string; language: string; vector: TraceHit[]; keyword: TraceHit[] };
 export type Trace = {
   strategy: string;
   named: string[];
   named_hits: TraceHit[];
   vector: TraceHit[];
   keyword: TraceHit[];
+  translation?: TranslationTrace | null; // Query Translation; missing on answers stored before it existed
   merged: string[];
   max_per_source: number;
   capped_out: number;

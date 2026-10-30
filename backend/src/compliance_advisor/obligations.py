@@ -2,13 +2,17 @@
 
 The model fills addressee, action, deadline and the Passage number only. The Provision label
 and its link are taken from that Passage, so they cannot be invented; rows that point to a
-Passage the answer did not have are dropped.
+Passage the answer did not have are dropped. An unreadable reply and dropped rows are logged as a
+failed prompt (logs.py).
 """
+
+import logging
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
+from .logs import prompt_failed
 from .prompt import question_language
 
 
@@ -65,9 +69,15 @@ def extract_obligations(
         ]
     )
     extraction: Extraction | None = result.get("parsed")
+    name = getattr(model, "model_name", None)
+    if extraction is None:
+        error = result.get("parsing_error")  # its text can quote the reply: the class only
+        reason = f"reply not readable ({type(error).__name__ if error else 'no extraction'})"
+        prompt_failed("obligations", reason, logging.WARNING, model=name)
     by_n = {p["n"]: p for p in chosen}
     rows = []
-    for row in extraction.obligations if extraction else []:
+    found = extraction.obligations if extraction else []
+    for row in found:
         source = by_n.get(row.passage)
         if source is None:
             continue
@@ -81,4 +91,7 @@ def extract_obligations(
                 passage=row.passage,
             )
         )
+    if dropped := len(found) - len(rows):
+        reason = f"rows citing a passage not given: {dropped} of {len(found)}"
+        prompt_failed("obligations", reason, logging.WARNING, model=name)
     return rows, result.get("raw")

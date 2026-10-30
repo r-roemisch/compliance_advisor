@@ -7,7 +7,7 @@ import re
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-log = logging.getLogger("compliance_advisor.precheck")
+from .logs import prompt_failed
 
 # Order matters: IBANs contain digit runs that would otherwise look like phone numbers.
 _PATTERNS = [
@@ -66,7 +66,7 @@ def screen(question: str, model) -> tuple[str, object]:
     try:
         reply = model.invoke(messages)
     except Exception as e:  # noqa: BLE001 - any failure of the screening call passes the question
-        log.warning("screening failed, question passed unscreened: %s", e)
+        prompt_failed("screening", e, logging.WARNING, model=getattr(model, "model_name", None))
         return "ok", None
     text = reply.content if isinstance(reply.content, str) else str(reply.content)
     return parse_verdict(text), reply
@@ -79,5 +79,5 @@ def parse_verdict(text: str) -> str:
             return "off_topic" if word.startswith("off") else "manipulation"
         if word == "ok":
             return "ok"
-    log.warning("screening answered unreadably (%d characters), question passed as ok", len(text))
+    prompt_failed("screening", f"unreadable verdict ({len(text)} characters)", logging.WARNING)
     return "ok"

@@ -2,11 +2,11 @@
 
 import pytest
 
-from compliance_advisor import api
+from compliance_advisor.api import app, throttling
 
 
 @pytest.fixture(autouse=True)
 def _fresh_api():
-    api._limiter.cache_clear()
+    throttling.limiter.cache_clear()
     yield
-    api.app.dependency_overrides.clear()
+    app.dependency_overrides.clear()

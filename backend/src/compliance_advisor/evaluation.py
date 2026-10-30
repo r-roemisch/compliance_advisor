@@ -7,6 +7,8 @@ Retrieval set-ups, so each change is measured on its own:
   cap          one Passage per Provision, per-Source cap, no lookup
   app          what the app does: per Provision, direct lookup of named Provisions, and the
                per-Source cap when MAX_PER_SOURCE is set (it is off since 2026-10-23)
+  translated   as app, with Query Translation: the question is also searched in the Corpus's
+               other language, merged by RRF (one short TRANSLATION_MODEL call per question)
   hybrid       the app's hybrid search: keyword ranks at KEYWORD_WEIGHT (0.5), merged by RRF
   hybrid-full  as hybrid, with keyword ranks at full weight (the first variant measured)
   hybrid-rerank    as hybrid-full, but keyword search only re-sorts the vector candidates
@@ -35,7 +37,8 @@ from pydantic import BaseModel
 from .answer import AnswerService
 from .embeddings import get_embeddings
 from .loaders import load
-from .models import chat_models, load_models
+from .models import ModelOption, chat_model, chat_models, helper_models, load_models, system_prompts
+from .query_translation import translate
 from .registry import load_sources
 from .retriever import Retriever
 from .settings import PROJECT_ROOT, Settings, get_settings
@@ -117,11 +120,20 @@ def labels_of(hit, naive: bool) -> list[str]:
 
 
 def score_retrieval(
-    retriever: Retriever, items: list[GoldenItem], k: int, naive: bool, strategy: str = "vector"
+    retriever: Retriever,
+    items: list[GoldenItem],
+    k: int,
+    naive: bool,
+    strategy: str = "vector",
+    translator=None,
 ) -> dict:
+    """With a `translator` model, every question is translated first and both are searched, as
+    the app does with Query Translation; each row then records the translation."""
     rows = []
     for item in items:
-        hits = retriever.retrieve(item.question, k, strategy)
+        translation = translate(item.question, translator)[0] if translator else None
+        translated = {"translation": translation.query} if translation else {}
+        hits = retriever.retrieve(item.question, k, strategy, **translated)
         ranked = [labels_of(h, naive) for h in hits]
         first = next(
             (
@@ -141,6 +153,11 @@ def score_retrieval(
                 "retrieved": [", ".join(labels) or "?" for labels in ranked],
                 "type": item.type or "untyped",
                 "cross_lingual": item.cross_lingual,
+                **(
+                    {"translation": translation.query if translation else None}
+                    if translator
+                    else {}
+                ),
             }
         )
     return {**_summarise(rows), "slices": slices_of(rows), "items": rows}
@@ -392,7 +409,8 @@ def write_report() -> None:
                 continue
 
             lines.append(
-                f"| {run['run_at'][:16]} | {run['label']} | {r['answer_model']} | {r['strategy']} | "
+                f"| {run['run_at'][:16]} | {run['label']} | {r['answer_model']} | "
+                f"{r['strategy']}{' + translation' if r.get('query_translation') else ''} | "
                 f"{questions} | {grader} | {_ragas_cell(scores, 'faithfulness')} | {_ragas_cell(scores, 'factual_correctness')} | "
                 f"{apart} | {sum(r['cost_usd'].values()):.3f} |"
             )
@@ -441,6 +459,7 @@ def main() -> None:
             "lookup",
             "cap",
             "app",
+            "translated",
             "hybrid",
             "hybrid-full",
             "hybrid-rerank",
@@ -485,9 +504,13 @@ def main() -> None:
             subsets["tune"] = [i for i in items if half_of(i.id) == "tune"]
             subsets["test"] = [i for i in items if half_of(i.id) == "test"]
         run["retrieval"][name] = {}
+        translator = None
+        if name == "translated":
+            option = ModelOption(id=settings.translation_model, label=settings.translation_model)
+            translator = chat_model(option, settings)
         # Every question is searched once per set-up; the subsets are cut from those rows.
         scored = score_retrieval(
-            retriever, seed if naive else items, args.k, naive, strategy_of(name)
+            retriever, seed if naive else items, args.k, naive, strategy_of(name), translator
         )["items"]
         for subset, chosen in subsets.items():
             ids = {i.id for i in chosen}
@@ -504,7 +527,8 @@ def main() -> None:
         models = chat_models(settings)
         default = load_models(settings.models_file)[0].id
         remaining = args.max_cost
-        for name in [s for s in args.setups if s in ("naive", "app") or s.startswith("hybrid")]:
+        answered = ("naive", "app", "translated")
+        for name in [s for s in args.setups if s in answered or s.startswith("hybrid")]:
             if remaining <= 0:
                 print(f"answers {name:6} skipped: cost cap of {args.max_cost} $ reached")
                 continue
@@ -515,7 +539,18 @@ def main() -> None:
 
                 tools = tool_factory
             service = AnswerService(
-                retriever, models, default, args.k, tools, strategy=strategy_of(name)
+                retriever,
+                models,
+                default,
+                args.k,
+                tools,
+                strategy=strategy_of(name),
+                prompts=system_prompts(settings.models_file),
+                translators=(
+                    helper_models(settings, models, settings.translation_model)
+                    if name == "translated"
+                    else None
+                ),
             )
             result = score_answers(service, seed if naive else items, naive, remaining)
             remaining -= result["cost_usd"]

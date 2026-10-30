@@ -5,7 +5,8 @@ import json
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage
 
-from compliance_advisor import api
+from compliance_advisor.api import app, deps, errors, throttling
+from compliance_advisor.api.routes import history
 from compliance_advisor.fetch import save_meta
 from compliance_advisor.models import ModelOption
 from compliance_advisor.monitoring import memory_errors
@@ -45,21 +46,21 @@ def _fail(*args, **kwargs):
 
 def test_refused_answers_are_not_sent_to_a_model(monkeypatch):
     audit = FakeAudit(_record(refusal="off_topic", passages=[], cited=[]))
-    api.app.dependency_overrides[api.get_audit] = lambda: audit
-    api.app.dependency_overrides[api.current_user] = lambda: OWNER
-    monkeypatch.setattr(api, "chat_model", _fail)
-    body = TestClient(api.app).post("/api/history/a1/obligations").json()
+    app.dependency_overrides[deps.get_audit] = lambda: audit
+    app.dependency_overrides[deps.current_user] = lambda: OWNER
+    monkeypatch.setattr(history, "chat_model", _fail)
+    body = TestClient(app).post("/api/history/a1/obligations").json()
     assert body == {"rows": [], "cost_usd": 0.0} and audit.saved is None
 
 
 def test_extraction_uses_the_answers_own_model_and_keeps_its_cost(monkeypatch):
     audit = FakeAudit(_record())
-    api.app.dependency_overrides[api.get_audit] = lambda: audit
-    api.app.dependency_overrides[api.current_user] = lambda: OWNER
+    app.dependency_overrides[deps.get_audit] = lambda: audit
+    app.dependency_overrides[deps.current_user] = lambda: OWNER
     chosen = []
-    monkeypatch.setattr(api, "chat_model", lambda option, settings: chosen.append(option.id))
+    monkeypatch.setattr(history, "chat_model", lambda option, settings: chosen.append(option.id))
     monkeypatch.setattr(
-        api,
+        history,
         "load_models",
         lambda path: [
             ModelOption(id="openai/gpt-6-luna", label="L"),
@@ -67,22 +68,22 @@ def test_extraction_uses_the_answers_own_model_and_keeps_its_cost(monkeypatch):
         ],
     )
     raw = AIMessage(content="", response_metadata={"token_usage": {"cost": 0.0021}})
-    monkeypatch.setattr(api, "extract_obligations", lambda model, q, p, c: ([], raw))
-    body = TestClient(api.app).post("/api/history/a1/obligations").json()
+    monkeypatch.setattr(history, "extract_obligations", lambda model, q, p, c: ([], raw))
+    body = TestClient(app).post("/api/history/a1/obligations").json()
     assert chosen == ["mistralai/mistral-large-4-0"]  # the answer's model, not the default
     assert body["cost_usd"] == 0.0021 and audit.saved == ([], 0.0021)
 
 
 def test_extraction_counts_against_the_rate_limit(monkeypatch):
     audit = FakeAudit(_record())
-    api.app.dependency_overrides[api.get_audit] = lambda: audit
-    api.app.dependency_overrides[api.current_user] = lambda: OWNER
-    monkeypatch.setattr(api, "chat_model", lambda option, settings: "model")
+    app.dependency_overrides[deps.get_audit] = lambda: audit
+    app.dependency_overrides[deps.current_user] = lambda: OWNER
+    monkeypatch.setattr(history, "chat_model", lambda option, settings: "model")
     monkeypatch.setattr(
-        api, "extract_obligations", lambda model, q, p, c: ([], AIMessage(content=""))
+        history, "extract_obligations", lambda model, q, p, c: ([], AIMessage(content=""))
     )
-    client = TestClient(api.app)
-    limit = api._limiter().limits.account_per_hour
+    client = TestClient(app)
+    limit = throttling.limiter().limits.account_per_hour
     for _ in range(limit):  # the account's hourly budget, shared with its questions
         assert client.post("/api/history/a1/obligations").status_code == 200
     assert client.post("/api/history/a1/obligations").status_code == 429
@@ -99,8 +100,8 @@ def test_a_fresh_download_keeps_the_text_fingerprint(tmp_path):
 
 def test_503s_are_counted_in_memory_not_in_the_down_database(monkeypatch):
     memory_errors.clear()
-    monkeypatch.setattr(api, "get_events", _fail)
-    api._record_error(503, "/api/ask")
-    api._record_error(503, "/api/ask")
+    monkeypatch.setattr(deps, "get_events", _fail)
+    errors.record_error(503, "/api/ask")
+    errors.record_error(503, "/api/ask")
     assert memory_errors[503] == 2
     memory_errors.clear()

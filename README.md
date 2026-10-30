@@ -15,7 +15,8 @@ Built as a Turing College bootcamp project. German interface by default, English
 - **Knows what applies when.** Each source carries its legal status, version and dated milestones checked against its own text, so the AMLR is marked as applying only from 10 July 2027 and the AI Act's high-risk rules from 2 December 2027.
 - **Rule checks** that the model calls when a question needs an exact result: which regimes apply to a firm, the compliance timeline, whether an ICT incident is major under DORA (with the reporting deadline), and the AI Act risk class of an AI use.
 - **Search strategy per question**: vector search (by meaning, also across languages; the default) or hybrid search (meaning plus exact words). Each answer records which one it used.
-- **How this answer was found**: under every answer, the search as a row of steps with numbers (what the pre-check removed, provisions looked up directly, vector and keyword candidates with scores, how each of the six passages was found, rule checks, model, tokens, cost, seconds). Every step opens its details; the trace is stored with the answer.
+- **Query translation**: every question is also searched in the corpus's other language, because EU acts are held in English and German acts in German. One short model call translates the question in the terms the regulations use, and the two rankings are merged ([ADR 0008](docs/adr/0008-query-translation-into-the-other-corpus-language.md)).
+- **How this answer was found**: under every answer, the search as a row of steps with numbers (what the pre-check removed, provisions looked up directly, vector and keyword candidates with scores, the translated search, how each of the six passages was found, rule checks, model, tokens, cost, seconds). Every step opens its details; the trace is stored with the answer.
 - **Pre-check before every search**: personal data is removed, then one short model call refuses manipulation attempts and off-topic questions, with the reason shown (see [How the Compliance Advisor protects its answers](#how-the-compliance-advisor-protects-its-answers)).
 - **Your sources have changed**: a nightly update run checks every source for a new version and reloads only what changed. The dashboard lists the sources your earlier answers relied on that have changed since; a reopened answer says so too.
 - **API keys and rate limits**: an account can create keys that may only ask questions and run rule checks, for its own programs or an MCP client. Guests get 10 questions an hour per browser (a signed cookie the backend sets; requests without a valid cookie share one bucket per address), accounts 30 an hour and 200 a day, registrations 5 an hour per address, login attempts 10 an hour per email, and the app has a daily cost ceiling (`config/limits.yaml`). Extracting obligations counts like a question.
@@ -27,7 +28,7 @@ Built as a Turing College bootcamp project. German interface by default, English
 - **Audit trail**: every answer is stored with the exact source versions it used and can be exported as Markdown, JSON or PDF.
 - **Honest progress**: the steps appear as they happen, the search step names what it found, and the answer appears while it is written.
 - **Accounts and dashboard** (optional): sign up with email and password; your questions, answers and Firm Profile stay private to you. The dashboard has five sections. The overview covers 7, 30 or 90 days or every question: key figures, questions per day, most-asked regimes, the **most-cited provisions** and the **blind spots** (sources that apply to your Firm Profile but never came up in your questions, each with a ready question). Every bar and provision opens the questions behind it. The other sections: a searchable table of all your questions, all your extracted obligations in one table with CSV export, the upcoming dates for your Firm Profile, and profile and account settings. Deleting the account deletes its answers.
-- **Model choice** including an EU-hosted model (Mistral Large 4 on Mistral AI's own servers), with tokens and cost shown for every answer.
+- **Model choice** including an EU-hosted model (Mistral Large 4 on Mistral AI's own servers), with tokens and cost shown for every answer. Each model answers under its own system prompt in `config/models.yaml`, written for how that model behaved in the evaluation.
 
 ### A typical session
 
@@ -98,10 +99,11 @@ sequenceDiagram
         API-->>FE: Refusal with the reason
         FE-->>U: The reason is shown
     else accepted
-        API->>OR: Embed the question
-        API->>DB: Search: provisions named in the question, then the most similar passages
+        API->>OR: Query translation: the question in the corpus's other language
+        API->>OR: Embed the question and its translation
+        API->>DB: Search: provisions named in the question, then the most similar passages for both, merged
         API-->>FE: Step events (server-sent): search, found
-        API->>OR: Answer Model: rules, passages, Firm Profile
+        API->>OR: Answer Model: its own system prompt, passages, Firm Profile
         opt The question needs an exact result
             OR-->>API: Rule check calls
             Note over API: Rule checks run in code: applicability, timeline, DORA incident, AI Act risk class
@@ -120,16 +122,17 @@ sequenceDiagram
 **Answering**, per question:
 
 1. A pre-check removes IBANs, email addresses and phone numbers.
-2. The six most similar passages are found by cosine similarity; a provision named in the question ("§ 25a KWG", "Art. 6 AI Act") is looked up directly and comes first.
-3. The prompt states the rules (cite every statement, separate binding law from supervisory expectation, say what is not covered) and adds the Firm Profile.
-4. The Answer Model may call the rule checks once, then writes the answer, which streams to the page.
-5. The answer is stored with its passages and source versions for the audit trail.
+2. Query translation: one short model call translates the question into the corpus's other language (English for a German question, German for an English one), in the terms the regulations use there.
+3. The six most similar passages are found by cosine similarity for the question and its translation, and the two rankings are merged by reciprocal rank fusion; a provision named in the question ("§ 25a KWG", "Art. 6 AI Act") is looked up directly and comes first.
+4. The chosen model's own system prompt (`config/models.yaml`) states the rules (cite every statement, separate binding law from supervisory expectation, say what is not covered); the Firm Profile, the passages and the question as asked follow.
+5. The Answer Model may call the rule checks once, then writes the answer, which streams to the page.
+6. The answer is stored with its passages and source versions for the audit trail.
 
 | Part | Stack |
 |---|---|
 | `backend/` | Python 3.12, FastAPI, LangChain (`langchain-openai` against OpenRouter), `langchain-postgres` |
 | `frontend/` | Next.js 16, React 19, Tailwind 4, IBM Plex fonts served by the app |
-| `config/` | `sources.yaml` (the 18 sources), `models.yaml` (Answer Models), `golden_set.yaml` (test questions) |
+| `config/` | `sources.yaml` (the 18 sources), `models.yaml` (Answer Models, each with its own system prompt), `golden_set.yaml` (test questions) |
 | Database | Postgres 17 with pgvector |
 
 ## Sources
@@ -177,7 +180,7 @@ Plain code, not model output: each check applies rules taken from the sources' o
 - **Every statement cited**; citations that point to no passage are not counted, and the evaluation checks that none occur.
 - **"Not covered" instead of guessing.** The answer says which part the sources do not cover, and the page shows it above the answer.
 - **No compliance verdicts.** The app explains what rules require; it never says whether a specific firm is compliant ([ADR 0003](docs/adr/0003-regulatory-information-not-legal-advice.md)).
-- **What leaves the app.** The question, the retrieved passages and the Firm Profile go to the Answer Model through OpenRouter. The pre-check removes IBANs, email addresses and phone numbers first; names are not detected. An EU-hosted model can be chosen. The browser itself contacts no third party.
+- **What leaves the app.** The question, the retrieved passages and the Firm Profile go to the Answer Model through OpenRouter; the question alone also goes to GPT-6 Luna for the screening and the query translation, unless an EU-hosted model was chosen, which then does both itself. The pre-check removes IBANs, email addresses and phone numbers first; names are not detected. The browser itself contacts no third party.
 - **Audit trail** of every answer with its source versions. With an account, answers are private to it; a guest's answers are visible only in the browser that asked ([ADR 0005](docs/adr/0005-optional-accounts-private-answers.md)).
 - **Accounts store** email address, name, Firm Profile and answers. Passwords are kept only as salted scrypt hashes and sessions as hashes in an httpOnly cookie. There is no email verification or password reset yet.
 
@@ -187,7 +190,7 @@ Compliance Officers need to know what a tool does with their questions and how f
 
 1. **Personal data is removed before anything leaves the app.** IBANs, email addresses and phone numbers in a question are replaced locally, before the question reaches any model. The interface asks not to enter confidential details; names and case facts are not recognised and stay the Compliance Officer's responsibility ([ADR 0004](docs/adr/0004-public-sources-only-no-firm-documents.md)).
 2. **Every question is screened, and refusals say why.** One short model call decides whether a question tries to change how the tool works (override its instructions, take on a role, plant an invented legal text, confirm a statement as law) or is not about financial regulation at all. Both are refused with the reason, and the question can be rephrased; there is no "answer anyway" button. Questions about exceptions, relief or what happens when rules are ignored are legitimate and pass. The screening runs on the cheapest model, or on the chosen EU-hosted model so that a question meant for an EU provider never goes elsewhere ([ADR 0007](docs/adr/0007-pre-check-screens-every-question.md)). **Measured on 2026-10-28** with [`config/precheck_set.yaml`](config/precheck_set.yaml): 30 of 30 attacks refused (18 manipulation attempts, 12 off-topic questions; every one with the expected reason), 0 of 30 legitimate questions that mention ignoring, skipping, hidden instructions or system prompts wrongly refused, and 0 of the 214 Golden Set questions wrongly refused. *Limits:* the test set holds the kinds of attack its author could think of; a new kind may pass. If the screening model fails to answer, the question passes unscreened and the event is logged, because a glitch must not refuse a legitimate question.
-3. **Passages are data, not instructions.** The prompt declares the question and the retrieved passages as material to answer from, never as instructions to follow. *Limit:* this is a prompt convention, not a hard boundary; the screening in point 2 is the layer that stops instructions reaching the model.
+3. **Passages are data, not instructions.** Every model's system prompt declares the question and the retrieved passages as material to answer from, never as instructions to follow, and a test checks that each prompt still says so. *Limit:* this is a prompt convention, not a hard boundary; the screening in point 2 is the layer that stops instructions reaching the model.
 4. **Every citation is checked.** A citation must point at one of the numbered passages the model was given; anything else is dropped. On the Golden Set every answer cites, and no citation points to a missing passage. *Limit:* a citation can be valid and still support a statement poorly; RAGAs faithfulness (0.96 on 50 questions) measures that, not the check.
 5. **Operators see figures, not questions.** The people running the app see counts, costs, times and error rates across all accounts, never question texts or answers; logs carry none either ([ADR 0006](docs/adr/0006-operator-sees-figures-not-questions.md)). Answers are private to the account that asked ([ADR 0005](docs/adr/0005-optional-accounts-private-answers.md)).
 
@@ -214,6 +217,7 @@ cd backend
 uv run compliance-advisor-eval --label "what changed"                  # naive, provision, app
 uv run compliance-advisor-eval --label "..." --setups lookup cap       # one change at a time
 uv run compliance-advisor-eval --label "..." --setups app hybrid --halves   # choose on one half, report the other
+uv run compliance-advisor-eval --label "..." --setups app translated --halves   # query translation against none
 uv run compliance-advisor-eval --label "..." --answers --max-cost 0.25 # also generate and score answers, with a cost cap
 uv run --group eval compliance-advisor-ragas --label "..." --n 50     # grade answers with RAGAs on a fixed sample
 uv run compliance-advisor-precheck-eval --label "..." --golden         # attacks refused, legitimate questions passed
@@ -230,9 +234,11 @@ docker compose up -d postgres                          # database only
 cd backend && uv sync
 uv run compliance-advisor-ingest --dry-run             # load and cut only; no key, no database
 uv run compliance-advisor-api                          # API on :8010
-uv run pytest                                          # 105 tests, no network, no database
+uv run pytest                                          # 134 tests, no network, no database
 cd ../frontend && npm install && npm run dev           # page on :3010, /api forwarded to :8010
 ```
+
+The HTTP API is the package `backend/src/compliance_advisor/api/`: `server.py` assembles the app (routers, MCP server, guest cookie, error handlers) and serves it; `routes/` holds one router per area (`ask`, `history`, `auth`, `account` for `/api/me`, `operator`, `corpus`); `deps.py` (the Answer Service, stores, who is asking), `throttling.py` (rate limits) and `errors.py` (error responses) are what the routers share.
 
 | Endpoint | Does |
 |---|---|
@@ -256,6 +262,8 @@ cd ../frontend && npm install && npm run dev           # page on :3010, /api for
 | `GET /api/health` | Backend and database status |
 
 Errors come back as `{"detail": "..."}`: 401 without a valid session or key, 403 for an API key on an account endpoint or a non-operator on an operator endpoint, 404 for an answer or key that is not yours, 409 when an update run is already in progress, 422 for invalid input, 429 when a rate limit or the daily cost ceiling is reached (`Retry-After` and `X-Limit` headers), 500 for anything unforeseen (counted for the operator, never with the exception's text), 502 when OpenRouter does not respond, 503 when the database is not reachable.
+
+**Logs** (`backend/src/compliance_advisor/logs.py`). Every response carries an `X-Request-ID` header, and every log line the request causes carries the same id (`LOG_FORMAT=json` writes one JSON object per line). Every failed prompt leaves one line on the logger `compliance_advisor.failures`: `prompt failed step=<step> model=… error=…`, with the error's class and first line but never the question ([ADR 0006](docs/adr/0006-operator-sees-figures-not-questions.md)); OpenRouter's error metadata, which can quote the question, and database parameters are left out. ERROR means the question got no answer: the Answer Service could not start (`start`), the search failed (`search`), or the Answer Model or a rule check failed (`answer`). WARNING means it went on: the screening failed and the question passed unscreened (`screening`), the translation failed and the question was searched alone (`translation`), the answer was not stored (`storage`), or the answer breaks the format its system prompt asks for (`answer`: cut off, empty, no Coverage line, or no citation although it claims coverage). Extracting obligations logs as `obligations`: ERROR when the model fails, WARNING for an unreadable reply or rows citing a passage it was not given. To see every failed prompt: `docker compose logs backend | grep "prompt failed"`; the operator's count of failed requests keeps the request id.
 
 ## Documentation
 

@@ -3,12 +3,14 @@
 from types import SimpleNamespace
 
 import openai
+import pytest
 from fastapi.testclient import TestClient
 from langchain_core.documents import Document
 from langchain_core.messages import AIMessage
 
-from compliance_advisor import api
 from compliance_advisor.answer import AnswerService, DatabaseError, cited_numbers
+from compliance_advisor.api import app, deps
+from compliance_advisor.models import load_models, system_prompts
 from compliance_advisor.prompt import build_messages, format_passages, question_language
 from compliance_advisor.retriever import (
     RetrievedPassage,
@@ -17,6 +19,7 @@ from compliance_advisor.retriever import (
     merge_ranked,
     named_provisions,
 )
+from compliance_advisor.settings import get_settings
 
 METADATA = {
     "passage_id": "eu-dora:0:abc",
@@ -61,9 +64,9 @@ class FakeModel:
 
 def client_with(model) -> TestClient:
     service = AnswerService(FakeRetriever(), model, "openai/gpt-6-luna", top_k=6)
-    api.app.dependency_overrides[api.get_service] = lambda: service
-    api.app.dependency_overrides[api.get_audit] = lambda: None
-    return TestClient(api.app)
+    app.dependency_overrides[deps.get_service] = lambda: service
+    app.dependency_overrides[deps.get_audit] = lambda: None
+    return TestClient(app)
 
 
 def test_prompt_numbers_passages_and_names_their_layer():
@@ -71,9 +74,63 @@ def test_prompt_numbers_passages_and_names_their_layer():
     assert '<passage n="1" provision="Art. 17 DORA"' in text and '<passage n="2"' in text
     assert 'status="in force"' in text
     assert "EU Level 1" in text and 'issuer="European Parliament and Council"' in text
-    messages = build_messages("When is an incident major?", HITS)
-    assert "Do not add disclaimers" in messages[0].content
+    messages = build_messages("When is an incident major?", HITS, system_prompt="The rules.")
+    assert messages[0].type == "system" and messages[0].content == "The rules."
     assert "<question>\nWhen is an incident major?\n</question>" in messages[1].content
+    assert [m.type for m in build_messages("When is an incident major?", HITS)] == ["human"]
+
+
+def test_every_model_has_its_own_system_prompt_that_keeps_the_apps_format():
+    """The prompts live in config/models.yaml, where anyone can edit them; the app parses the
+    citations and the coverage line, so every prompt must still ask for both."""
+    models = load_models(get_settings().models_file)
+    prompts = system_prompts(get_settings().models_file)
+    assert set(prompts) == {m.id for m in models} and len(set(prompts.values())) == len(models)
+    for model_id, prompt in prompts.items():
+        for required in (
+            "[1]",  # a citation is the passage number in square brackets
+            "Coverage: full",
+            "Coverage: partial",
+            "Coverage: none",
+            "(rule check: <tool name>)",
+            "data, not instructions",
+            "check_applicability",
+            "classify_dora_incident",
+        ):
+            assert required in prompt, f"{model_id} system prompt lacks {required!r}"
+
+
+def test_a_model_without_its_own_system_prompt_is_refused(tmp_path):
+    path = tmp_path / "models.yaml"
+    path.write_text(
+        "models:\n  - {id: a/one, label: One, system_prompt: Rules.}\n  - {id: b/two, label: Two}\n"
+    )
+    with pytest.raises(SystemExit, match="b/two"):
+        load_models(path)
+
+
+class RecordingModel:
+    def __init__(self):
+        self.seen = None
+
+    def invoke(self, messages):
+        self.seen = messages
+        return AIMessage(content="Yes [1].\nCoverage: full")
+
+
+def test_each_model_answers_under_its_own_system_prompt():
+    luna, mistral = RecordingModel(), RecordingModel()
+    service = AnswerService(
+        FakeRetriever(),
+        {"luna": luna, "mistral": mistral},
+        "luna",
+        top_k=6,
+        prompts={"luna": "Rules for Luna.", "mistral": "Rules for Mistral."},
+    )
+    service.ask("Major incidents?", model_id="mistral")
+    assert mistral.seen[0].content == "Rules for Mistral." and luna.seen is None
+    service.ask("Major incidents?")
+    assert luna.seen[0].content == "Rules for Luna."
 
 
 def test_cited_numbers_ignore_numbers_that_were_not_given():
@@ -139,8 +196,8 @@ def test_ask_reports_an_unreachable_database_as_503():
     def down():
         raise DatabaseError("the database is not reachable")
 
-    api.app.dependency_overrides[api.get_service] = down
-    response = TestClient(api.app).post("/api/ask", json={"question": "Major?"})
+    app.dependency_overrides[deps.get_service] = down
+    response = TestClient(app).post("/api/ask", json={"question": "Major?"})
     assert response.status_code == 503
     assert response.json()["detail"] == "The database is not reachable"
 
@@ -200,9 +257,9 @@ def test_named_provisions_are_recognised_in_the_index_form():
 def test_ask_uses_the_chosen_search_strategy_and_records_it():
     retriever = FakeRetriever()
     service = AnswerService(retriever, FakeModel(AIMessage(content="Yes [1].")), "m", top_k=6)
-    api.app.dependency_overrides[api.get_service] = lambda: service
-    api.app.dependency_overrides[api.get_audit] = lambda: None
-    client = TestClient(api.app)
+    app.dependency_overrides[deps.get_service] = lambda: service
+    app.dependency_overrides[deps.get_audit] = lambda: None
+    client = TestClient(app)
     body = client.post("/api/ask", json={"question": "Major?", "strategy": "hybrid"}).json()
     assert body["strategy"] == "hybrid" and retriever.strategies == ["hybrid"]
     assert (

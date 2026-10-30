@@ -3,8 +3,8 @@
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage
 
-from compliance_advisor import api
 from compliance_advisor.answer import AnswerService
+from compliance_advisor.api import app, deps, throttling
 from compliance_advisor.apikeys import PREFIX, key_hash, public
 from compliance_advisor.limits import DAY, HOUR, Limits, RateLimiter
 
@@ -49,11 +49,11 @@ def test_keys_are_hashed_and_shown_only_as_prefix():
 
 def _client(user):
     service = AnswerService(FakeRetriever(), FakeModel(AIMessage(content="Yes [1].")), "m", top_k=6)
-    api.app.dependency_overrides[api.get_service] = lambda: service
-    api.app.dependency_overrides[api.get_audit] = lambda: None
-    api.app.dependency_overrides[api.current_user] = lambda: user
-    api._limiter.cache_clear()
-    return TestClient(api.app)
+    app.dependency_overrides[deps.get_service] = lambda: service
+    app.dependency_overrides[deps.get_audit] = lambda: None
+    app.dependency_overrides[deps.current_user] = lambda: user
+    throttling.limiter.cache_clear()
+    return TestClient(app)
 
 
 def test_api_key_may_ask_but_not_read_the_account():
@@ -69,7 +69,7 @@ def _ask(client):
 
 
 def test_guests_are_limited_per_browser_not_per_address():
-    limit = api._limiter().limits.guest_per_hour
+    limit = throttling.limiter().limits.guest_per_hour
     browser_a = _client(None)
     first = _ask(browser_a)
     assert first.status_code == 200
@@ -83,13 +83,13 @@ def test_guests_are_limited_per_browser_not_per_address():
     assert blocked.status_code == 429
     assert "try again at" in blocked.json()["detail"] and "Retry-After" in blocked.headers
     # Another browser from the same address (the test client, like the Next.js proxy) still may.
-    browser_b = TestClient(api.app)
+    browser_b = TestClient(app)
     assert _ask(browser_b).status_code == 200
     assert _ask(browser_b).status_code == 200
 
 
 def test_forged_guest_cookies_fall_back_to_the_address_bucket():
-    limit = api._limiter().limits.guest_per_hour
+    limit = throttling.limiter().limits.guest_per_hour
     client = _client(None)
     for n in range(limit):
         client.cookies.clear()
@@ -105,15 +105,15 @@ def test_forged_guest_cookies_fall_back_to_the_address_bucket():
 def test_forwarded_address_is_only_believed_behind_a_trusted_proxy(monkeypatch):
     from compliance_advisor.settings import Settings
 
-    limit = api._limiter().limits.guest_per_hour
+    limit = throttling.limiter().limits.guest_per_hour
     client = _client(None)
     for n in range(limit):
         client.cookies.clear()
         assert _ask_from(client, f"10.0.0.{n}").status_code == 200
     client.cookies.clear()
     assert _ask_from(client, "10.0.0.99").status_code == 429  # header ignored: one address
-    monkeypatch.setattr(api, "get_settings", lambda: Settings(trust_x_forwarded_for=True))
-    api._limiter.cache_clear()
+    monkeypatch.setattr(throttling, "get_settings", lambda: Settings(trust_x_forwarded_for=True))
+    throttling.limiter.cache_clear()
     for n in range(limit + 2):
         client.cookies.clear()
         assert _ask_from(client, f"10.0.0.{n}").status_code == 200  # now one bucket per address
@@ -126,7 +126,7 @@ def _ask_from(client, forwarded):
 
 
 def test_requests_without_any_cookie_share_the_address_bucket():
-    limit = api._limiter().limits.guest_per_hour
+    limit = throttling.limiter().limits.guest_per_hour
     client = _client(None)
     for _ in range(limit):
         client.cookies.clear()  # a script that drops the cookie every time
@@ -152,9 +152,9 @@ def test_registrations_are_limited_per_address(monkeypatch):
         def start_session(self, user_id):
             return "token"
 
-    monkeypatch.setattr(api, "get_accounts", lambda: Accounts())
-    client = TestClient(api.app)
-    limit = api._limiter().limits.registrations_per_hour
+    monkeypatch.setattr(deps, "get_accounts", lambda: Accounts())
+    client = TestClient(app)
+    limit = throttling.limiter().limits.registrations_per_hour
     for n in range(limit):
         body = {"email": f"u{n}@example.org", "password": "Secret-123"}
         assert client.post("/api/auth/register", json=body).status_code == 200
@@ -171,9 +171,9 @@ def test_login_attempts_are_limited_per_email(monkeypatch):
         def authenticate(self, email, password):
             raise AccountError("Email address or password is wrong.")
 
-    monkeypatch.setattr(api, "get_accounts", lambda: Accounts())
-    client = TestClient(api.app)
-    limit = api._limiter().limits.login_attempts_per_hour
+    monkeypatch.setattr(deps, "get_accounts", lambda: Accounts())
+    client = TestClient(app)
+    limit = throttling.limiter().limits.login_attempts_per_hour
     for _ in range(limit):
         assert (
             client.post(

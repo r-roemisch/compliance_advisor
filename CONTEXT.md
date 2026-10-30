@@ -112,6 +112,10 @@ _Avoid_: Reference, footnote, link
 How Passages are found for a question: by meaning alone (vector search) or by meaning and exact words together (hybrid search). Chosen per question and recorded with the answer.
 _Avoid_: Retriever, search mode, RAG strategy
 
+**Query Translation**:
+The question translated into the Corpus's other language (English for a German question, German for an English one), in the terms the Sources use there, and searched alongside the question with the same Search Strategy. It only steers the search: the answer is to the question as asked.
+_Avoid_: Query rewriting, multi-query, translated question
+
 **Answer Trace**:
 The saved record of every step from question to answer: what the pre-check removed, which Passages each search found and with what score, which were kept, which Rule Checks ran, and which Answer Model wrote the answer at what cost.
 _Avoid_: Debug info, log, pipeline view

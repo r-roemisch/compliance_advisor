@@ -3,8 +3,8 @@
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage
 
-from compliance_advisor import api
 from compliance_advisor.answer import AnswerService
+from compliance_advisor.api import app, deps
 from compliance_advisor.precheck import VERDICTS, parse_verdict, screen
 from compliance_advisor.precheck_eval import load_set, summarise
 from compliance_advisor.settings import get_settings
@@ -34,9 +34,9 @@ def _client(screener_reply: str):
         )
     )
     service = AnswerService(FakeRetriever(), answer, "m", top_k=6, screeners={"m": screener})
-    api.app.dependency_overrides[api.get_service] = lambda: service
-    api.app.dependency_overrides[api.get_audit] = lambda: None
-    return TestClient(api.app)
+    app.dependency_overrides[deps.get_service] = lambda: service
+    app.dependency_overrides[deps.get_audit] = lambda: None
+    return TestClient(app)
 
 
 def test_refused_question_gets_a_refusal_and_no_passages():

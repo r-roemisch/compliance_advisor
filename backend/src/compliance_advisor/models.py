@@ -1,10 +1,12 @@
-"""Answer Models offered in the interface (config/models.yaml), reached through OpenRouter."""
+"""Answer Models offered in the interface (config/models.yaml), each with its own system prompt,
+reached through OpenRouter."""
 
 from functools import lru_cache
 from pathlib import Path
 
 import httpx
 import yaml
+from langchain_core.language_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel
 
@@ -17,6 +19,9 @@ class ModelOption(BaseModel, extra="forbid"):
     note: dict[str, str] = {}
     eu_hosted: bool = False
     provider_only: list[str] = []
+    # The rules this Answer Model writes by; every entry in models.yaml has its own. Empty only
+    # for a model that does a step before the answer, such as the screening model.
+    system_prompt: str = ""
 
 
 def load_models(path: Path) -> list[ModelOption]:
@@ -30,7 +35,14 @@ def _load_models(path: Path, version: int) -> list[ModelOption]:
     models = [ModelOption.model_validate(e) for e in entries]
     if not models:
         raise SystemExit(f"{path} lists no models")
+    if missing := [m.id for m in models if not m.system_prompt.strip()]:
+        raise SystemExit(f"{path}: every model needs its own system_prompt; missing for {missing}")
     return models
+
+
+def system_prompts(path: Path) -> dict[str, str]:
+    """Each Answer Model's own system prompt, by model id."""
+    return {m.id: m.system_prompt.strip() for m in load_models(path)}
 
 
 def chat_model(option: ModelOption, settings: Settings) -> ChatOpenAI:
@@ -70,3 +82,17 @@ def list_price(model_id: str) -> tuple[float, float] | None:
 
 def chat_models(settings: Settings) -> dict[str, ChatOpenAI]:
     return {m.id: chat_model(m, settings) for m in load_models(settings.models_file)}
+
+
+def helper_models(
+    settings: Settings, models: dict[str, BaseChatModel], helper_id: str
+) -> dict[str, BaseChatModel]:
+    """Which model runs a step before the answer (screening, query translation) for which Answer
+    Model (ADR 0007): an EU-hosted Answer Model runs it itself, so its questions never go to
+    another provider; the others use `helper_id`, a cheap model."""
+    helper = models.get(helper_id) or chat_model(
+        ModelOption(id=helper_id, label=helper_id), settings
+    )
+    return {
+        m.id: models[m.id] if m.eu_hosted else helper for m in load_models(settings.models_file)
+    }

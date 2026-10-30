@@ -1,4 +1,5 @@
-"""Answering: pre-check, retrieve, one tool round, call the Answer Model, assemble the response."""
+"""Answering: pre-check, translate the question, retrieve, one tool round, call the Answer Model
+under its own system prompt, assemble the response."""
 
 import json
 import logging
@@ -14,9 +15,11 @@ from langchain_core.tools import StructuredTool
 from pydantic import ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 
+from .logs import prompt_failed
 from .precheck import redact, screen
 from .profile import FirmProfile
 from .prompt import DISCLAIMER, build_messages
+from .query_translation import translate
 from .retriever import Retriever
 from .schemas import AskResponse, PassageOut, ToolRun, Trace, Usage
 
@@ -78,7 +81,31 @@ def split_coverage(answer: str) -> tuple[str, str]:
     return answer[: match.start()].rstrip(), match.group(1).lower()
 
 
+def format_problems(
+    answer: str, coverage: str, cited: int, passages: int, finish: str | None
+) -> list[str]:
+    """How an answer misses the format every system prompt asks for: stopped by the provider,
+    empty, without the Coverage line, or without a citation though it claims to cover the
+    question."""
+    problems = []
+    if finish == "length":
+        problems.append("cut off at the output limit")
+    elif finish == "content_filter":
+        problems.append("stopped by the provider's content filter")
+    if not answer:
+        problems.append("empty answer")
+    elif coverage == "unknown":
+        problems.append("no Coverage line")
+    if answer and passages and not cited and coverage != "none":
+        problems.append("no citation")
+    return problems
+
+
 Stage = Callable[[str, dict], None]
+
+# The step a question fails in, from the last stage it reported; from the Passages on, it is the
+# Answer Model's round.
+_STEPS = {"precheck": "precheck", "refused": "precheck", "search": "search"}
 
 
 def usage_reported(replies) -> bool:
@@ -110,13 +137,20 @@ class AnswerService:
         prices: Callable[[str], tuple[float, float] | None] | None = None,
         strategy: str = "vector",
         screeners: dict[str, BaseChatModel] | None = None,
+        prompts: dict[str, str] | None = None,
+        translators: dict[str, BaseChatModel] | None = None,
     ):
         """`models` maps model ids to chat models; `model_id` is the default, and `strategy` the
-        default Search Strategy. `screeners` maps each Answer Model id to the model that screens
-        questions for it (ADR 0007); without it, questions are not screened."""
+        default Search Strategy. `prompts` maps each model id to its own system prompt
+        (config/models.yaml); without one, as in tests, the model gets the Passages and the
+        question only. `screeners` and `translators` map each Answer Model id to the model that
+        screens its questions (ADR 0007) and the one that translates them for the search
+        (ADR 0008); without them, questions are not screened or not translated."""
         self.retriever = retriever
         self.strategy = strategy
         self.screeners = screeners or {}
+        self.prompts = prompts or {}
+        self.translators = translators or {}
         self.models = models if isinstance(models, dict) else {model_id: models}
         self.model_id = model_id
         self.top_k = top_k
@@ -184,11 +218,37 @@ class AnswerService:
         on_stage: Stage = _quiet,
         strategy: str | None = None,
     ) -> AskResponse:
+        """Answers a question. If it fails on the way, the step it failed in is logged before
+        the error goes on to the caller (logs.py)."""
         started = time.monotonic()
         model_id = model_id or self.model_id
         strategy = strategy or self.strategy
         if model_id not in self.models:
             raise ValueError(f"unknown model {model_id!r}; choose one of {', '.join(self.models)}")
+        step = "precheck"
+
+        def report(stage: str, data: dict) -> None:
+            nonlocal step
+            step = _STEPS.get(stage, "answer")
+            on_stage(stage, data)
+
+        try:
+            return self._answer(question, top_k, profile, model_id, report, strategy, started)
+        except Exception as e:
+            seconds = round(time.monotonic() - started, 1)
+            prompt_failed(step, e, model=model_id, strategy=strategy, seconds=seconds)
+            raise
+
+    def _answer(
+        self,
+        question: str,
+        top_k: int | None,
+        profile: FirmProfile | None,
+        model_id: str,
+        on_stage: Stage,
+        strategy: str,
+        started: float,
+    ) -> AskResponse:
         question, redactions = redact(question)
         on_stage("precheck", {"redactions": redactions})
         screener = self.screeners.get(model_id)
@@ -217,17 +277,30 @@ class AnswerService:
                     ),
                 )
         on_stage("search", {"redactions": redactions})
+        translation, translation_reply = None, None
+        if (translator := self.translators.get(model_id)) is not None:
+            translating = time.monotonic()
+            translation, translation_reply = translate(question, translator)
+            translation_seconds = round(time.monotonic() - translating, 2)
+        translated = {"translation": translation.query} if translation else {}
         try:
             if hasattr(self.retriever, "search"):
-                passages, trace = self.retriever.search(question, top_k or self.top_k, strategy)
+                passages, trace = self.retriever.search(
+                    question, top_k or self.top_k, strategy, **translated
+                )
             else:  # a retriever without an Answer Trace, as in tests
-                passages = self.retriever.retrieve(question, top_k or self.top_k, strategy)
+                passages = self.retriever.retrieve(
+                    question, top_k or self.top_k, strategy, **translated
+                )
                 trace = {"strategy": strategy, "vector": []}
             trace["seconds"] = {"search": round(time.monotonic() - started, 2)}
         except openai.APIError as e:
             raise UpstreamError(f"the embedding service did not respond: {e}") from e
         except SQLAlchemyError as e:
             raise DatabaseError("the database is not reachable") from e
+        if translation and trace.get("translation"):
+            trace["translation"]["language"] = translation.language
+            trace["seconds"]["translation"] = translation_seconds
         on_stage(
             "found",
             {
@@ -237,7 +310,12 @@ class AnswerService:
                 ),
             },
         )
-        messages = build_messages(question, passages, profile.describe() if profile else "")
+        messages = build_messages(
+            question,
+            passages,
+            profile.describe() if profile else "",
+            self.prompts.get(model_id, ""),
+        )
         answering = time.monotonic()
         try:
             reply, replies, runs = self._tool_round(
@@ -251,8 +329,8 @@ class AnswerService:
         answer, coverage = split_coverage(_text(reply))
         if not usage_reported(replies):
             log.debug("cost computed from list prices for %s", model_id)
-        if screening_reply is not None:
-            replies = [screening_reply, *replies]  # the screening call is part of the cost
+        # the screening and translation calls are part of the cost
+        replies = [r for r in (screening_reply, translation_reply) if r is not None] + replies
         usage = _usage(*replies, prices=self.prices(model_id))
         response = AskResponse(
             question=question,
@@ -280,12 +358,20 @@ class AnswerService:
             usage=usage,
             disclaimer=DISCLAIMER,
         )
-        log.info(
-            "ask duration=%.1fs model=%s strategy=%s input_tokens=%d output_tokens=%d tools=%d "
-            "redactions=%d passages=%d cited=%d",  # counts only: no subject leaves the audit trail
+        finish = (getattr(reply, "response_metadata", None) or {}).get("finish_reason")
+        if problems := format_problems(
+            answer, coverage, len(response.cited), len(passages), finish
+        ):
+            prompt_failed(
+                "answer", "; ".join(problems), logging.WARNING, model=model_id, strategy=strategy
+            )
+        log.info(  # counts only: no subject leaves the audit trail
+            "ask duration=%.1fs model=%s strategy=%s translated=%s input_tokens=%d "
+            "output_tokens=%d tools=%d redactions=%d passages=%d cited=%d",
             time.monotonic() - started,
             model_id,
             strategy,
+            translation is not None,
             usage.input_tokens,
             usage.output_tokens,
             len(runs),

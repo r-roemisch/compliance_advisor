@@ -5,7 +5,7 @@ import { useState } from "react";
 import { TOOL_NAMES, type Strings } from "@/lib/i18n";
 import type { AskResponse, Lang, TraceHit } from "@/lib/types";
 
-type StepId = "precheck" | "named" | "vector" | "keyword" | "merged" | "cap" | "passages" | "tools" | "model";
+type StepId = "precheck" | "named" | "vector" | "translation" | "keyword" | "merged" | "cap" | "passages" | "tools" | "model";
 
 /** The Answer Trace: every step from question to answer, as a flow of chips with the numbers;
  *  each chip opens what happened in that step. Stored with the answer, so it reopens from history. */
@@ -14,6 +14,7 @@ export function AnswerTrace({ t, lang, result }: { t: Strings; lang: Lang; resul
   const trace = result.trace;
   if (!trace) return null;
   const hybrid = trace.strategy === "hybrid";
+  const translation = trace.translation;
   const byId = new Map(result.passages.map((p) => [p.passage_id, p]));
   const seconds = trace.seconds ?? {};
 
@@ -60,9 +61,33 @@ export function AnswerTrace({ t, lang, result }: { t: Strings; lang: Lang; resul
         ]
       : []),
     { id: "vector", label: t.traceVector, value: t.traceCandidates(trace.vector.length), details: hitList(trace.vector) },
-    ...(hybrid
+    ...(translation
       ? [
-          { id: "keyword" as StepId, label: t.traceKeyword, value: t.traceCandidates(trace.keyword.length), details: hitList(trace.keyword, true) },
+          {
+            id: "translation" as StepId,
+            label: t.traceTranslation,
+            value: t.traceCandidates(translation.vector.length + translation.keyword.length),
+            details: (
+              <div className="text-sm">
+                <p className="mb-1 font-medium">{translation.query}</p>
+                <p className="mb-2 text-ink-2">{t.traceTranslationLong(t.traceLanguages[translation.language] ?? translation.language)}</p>
+                {hitList(translation.vector)}
+                {translation.keyword.length > 0 && (
+                  <>
+                    <p className="mb-1 mt-2 text-xs text-ink-2">{t.traceKeyword}</p>
+                    {hitList(translation.keyword, true)}
+                  </>
+                )}
+              </div>
+            ),
+          },
+        ]
+      : []),
+    ...(hybrid
+      ? [{ id: "keyword" as StepId, label: t.traceKeyword, value: t.traceCandidates(trace.keyword.length), details: hitList(trace.keyword, true) }]
+      : []),
+    ...(trace.merged.length
+      ? [
           {
             id: "merged" as StepId,
             label: t.traceMerged,

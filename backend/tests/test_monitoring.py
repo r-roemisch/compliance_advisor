@@ -6,8 +6,9 @@ from datetime import UTC, date, datetime
 
 from fastapi.testclient import TestClient
 
-from compliance_advisor import api
-from compliance_advisor.monitoring import JsonFormatter, overview
+from compliance_advisor.api import app, deps
+from compliance_advisor.logs import JsonFormatter
+from compliance_advisor.monitoring import overview
 
 
 def _row(day: int, **extra) -> dict:
@@ -59,8 +60,8 @@ def test_json_log_lines_carry_no_free_text_structure_problems():
 
 def test_only_operators_see_the_overview(monkeypatch):
     user = {"id": "u1", "email": "ops@example.org", "name": "", "profile": None}
-    api.app.dependency_overrides[api.current_user] = lambda: user
-    client = TestClient(api.app)
+    app.dependency_overrides[deps.current_user] = lambda: user
+    client = TestClient(app)
     assert client.get("/api/operator/overview").status_code == 403
     user["operator"] = True  # granted with `compliance-advisor-accounts operator grant`
 
@@ -71,8 +72,8 @@ def test_only_operators_see_the_overview(monkeypatch):
         def since(self, start, kind=None):
             return []
 
-    api.app.dependency_overrides[api.get_events] = lambda: FakeEvents()
-    monkeypatch.setattr(api, "get_events", lambda: FakeEvents())
+    app.dependency_overrides[deps.get_events] = lambda: FakeEvents()
+    monkeypatch.setattr(deps, "get_events", lambda: FakeEvents())
     response = client.get("/api/operator/overview?days=7")
     assert response.status_code == 200 and response.json()["stats"]["questions"] == 0
     assert client.get("/api/auth/me").json()["user"]["operator"] is True

@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     # chosen Answer Model is EU-hosted, which then screens itself.
     screening: bool = True
     screening_model: str = "openai/gpt-6-luna"
+    # Query Translation (ADR 0008): the question is also searched in the Corpus's other language.
+    # The model that translates, unless the chosen Answer Model is EU-hosted and translates itself.
+    query_translation: bool = True
+    translation_model: str = "openai/gpt-6-luna"
     log_format: str = "json"  # json (one object per line) | text
     # Update Runs: a nightly check of every Source for a new version, inside the backend.
     update_runs: bool = False
